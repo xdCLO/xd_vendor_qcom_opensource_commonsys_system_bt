@@ -1619,18 +1619,28 @@ void l2cu_release_ccb(tL2C_CCB* p_ccb) {
   p_ccb->in_use = false;
 
   /* If no channels on the connection, start idle timeout */
-  if ((p_lcb) && p_lcb->in_use && (p_lcb->link_state == LST_CONNECTED)) {
-    if (!p_lcb->ccb_queue.p_first_ccb) {
-      // Closing a security channel on LE device should not start connection
-      // timeout
-      if (p_lcb->transport == BT_TRANSPORT_LE &&
-          p_ccb->local_cid == L2CAP_SMP_CID)
-        return;
+  if ((p_lcb) && p_lcb->in_use) {
+    if (p_lcb->link_state == LST_CONNECTED) {
+      if (!p_lcb->ccb_queue.p_first_ccb) {
+        // Closing a security channel on LE device should not start connection
+        // timeout
+        if (p_lcb->transport == BT_TRANSPORT_LE &&
+            p_ccb->local_cid == L2CAP_SMP_CID)
+          return;
 
-      l2cu_no_dynamic_ccbs(p_lcb);
-    } else {
-      /* Link is still active, adjust channel quotas. */
-      l2c_link_adjust_chnl_allocation();
+        l2cu_no_dynamic_ccbs(p_lcb);
+      } else {
+        /* Link is still active, adjust channel quotas. */
+        l2c_link_adjust_chnl_allocation();
+      }
+    } else if (p_lcb->link_state == LST_CONNECTING && !l2cb.is_ble_connecting) {
+      if (!p_lcb->ccb_queue.p_first_ccb) {
+        if (p_lcb->transport == BT_TRANSPORT_LE &&
+            p_ccb->local_cid == L2CAP_ATT_CID) {
+          L2CAP_TRACE_WARNING("%s - disconnecting the LE link", __func__);
+          l2cu_no_dynamic_ccbs(p_lcb);
+        }
+      }
     }
   }
 }
@@ -2671,28 +2681,34 @@ void l2cu_process_fixed_chnl_resp(tL2C_LCB* p_lcb) {
 
   /* Tell all registered fixed channels about the connection */
   for (int xx = 0; xx < L2CAP_NUM_FIXED_CHNLS; xx++) {
+    uint16_t channel_id = xx + L2CAP_FIRST_FIXED_CHNL;
+
+    /* See BT Spec Ver 5.0 | Vol 3, Part A 2.1 table 2.1 and 2.2 */
+
     /* skip sending LE fix channel callbacks on BR/EDR links */
     if (p_lcb->transport == BT_TRANSPORT_BR_EDR &&
-        xx + L2CAP_FIRST_FIXED_CHNL >= L2CAP_ATT_CID &&
-        xx + L2CAP_FIRST_FIXED_CHNL <= L2CAP_SMP_CID)
+        channel_id >= L2CAP_ATT_CID && channel_id <= L2CAP_SMP_CID)
       continue;
-    if (l2cb.fixed_reg[xx].pL2CA_FixedConn_Cb != NULL) {
-      if (p_lcb->peer_chnl_mask[(xx + L2CAP_FIRST_FIXED_CHNL) / 8] &
-          (1 << ((xx + L2CAP_FIRST_FIXED_CHNL) % 8))) {
-        if (p_lcb->p_fixed_ccbs[xx])
-          p_lcb->p_fixed_ccbs[xx]->chnl_state = CST_OPEN;
-        (*l2cb.fixed_reg[xx].pL2CA_FixedConn_Cb)(xx + L2CAP_FIRST_FIXED_CHNL,
-                                                 p_lcb->remote_bd_addr, true, 0,
-                                                 p_lcb->transport);
-      } else {
-        (*l2cb.fixed_reg[xx].pL2CA_FixedConn_Cb)(
-            xx + L2CAP_FIRST_FIXED_CHNL, p_lcb->remote_bd_addr, false,
-            p_lcb->disc_reason, p_lcb->transport);
 
-        if (p_lcb->p_fixed_ccbs[xx]) {
-          l2cu_release_ccb(p_lcb->p_fixed_ccbs[xx]);
-          p_lcb->p_fixed_ccbs[xx] = NULL;
-        }
+    /* skip sending BR fix channel callbacks on LE links */
+    if (p_lcb->transport == BT_TRANSPORT_LE && channel_id == L2CAP_SMP_BR_CID)
+      continue;
+
+    if (!l2cb.fixed_reg[xx].pL2CA_FixedConn_Cb) continue;
+
+    if (p_lcb->peer_chnl_mask[(channel_id) / 8] & (1 << ((channel_id) % 8))) {
+      if (p_lcb->p_fixed_ccbs[xx])
+        p_lcb->p_fixed_ccbs[xx]->chnl_state = CST_OPEN;
+      (*l2cb.fixed_reg[xx].pL2CA_FixedConn_Cb)(
+          channel_id, p_lcb->remote_bd_addr, true, 0, p_lcb->transport);
+    } else {
+      (*l2cb.fixed_reg[xx].pL2CA_FixedConn_Cb)(
+          channel_id, p_lcb->remote_bd_addr, false, p_lcb->disc_reason,
+          p_lcb->transport);
+
+      if (p_lcb->p_fixed_ccbs[xx]) {
+        l2cu_release_ccb(p_lcb->p_fixed_ccbs[xx]);
+        p_lcb->p_fixed_ccbs[xx] = NULL;
       }
     }
   }

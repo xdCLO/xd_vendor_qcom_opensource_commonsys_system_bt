@@ -118,16 +118,6 @@ struct btif_hf_cb_t {
 
 static btif_hf_cb_t btif_hf_cb[BTA_AG_MAX_NUM_CLIENTS];
 
-/* By default, even though codec negotiation is enabled, we will not use WBS as
- * the default
- * codec unless this variable is set to true.
- */
-#ifndef BTIF_HF_WBS_PREFERRED
-#define BTIF_HF_WBS_PREFERRED false
-#endif
-
-static bool btif_conf_hf_force_wbs = BTIF_HF_WBS_PREFERRED;
-
 static const char* dump_hf_call_state(bthf_call_state_t call_state) {
   switch (call_state) {
     CASE_RETURN_STR(BTHF_CALL_STATE_IDLE)
@@ -511,7 +501,7 @@ static void btif_hf_upstreams_evt(uint16_t event, char* p_param) {
       we should set the BTA AG Codec to mSBC. This would trigger a +BCS to mSBC
       at the time
       of SCO connection establishment */
-      if ((btif_conf_hf_force_wbs) && (p_data->val.num & BTA_AG_CODEC_MSBC)) {
+      if (p_data->val.num & BTA_AG_CODEC_MSBC) {
         BTIF_TRACE_EVENT("%s: btif_hf override-Preferred Codec to MSBC",
                          __func__);
         BTA_AgSetCodec(btif_hf_cb[idx].handle, BTA_AG_CODEC_MSBC);
@@ -783,14 +773,12 @@ bt_status_t HeadsetInterface::ConnectAudio(RawAddress* bd_addr) {
     LOG(ERROR) << ": SLC not connected for " << *bd_addr;
     return BT_STATUS_NOT_READY;
   }
-  BTA_AgAudioOpen(btif_hf_cb[idx].handle);
-  // Inform the application that the audio connection has been initiated
-  // successfully
   do_in_jni_thread(base::Bind(&Callbacks::AudioStateCallback,
                               // Manual pointer management for now
                               base::Unretained(bt_hf_callbacks),
                               BTHF_AUDIO_STATE_CONNECTING,
                               &btif_hf_cb[idx].connected_bda));
+  BTA_AgAudioOpen(btif_hf_cb[idx].handle);
   return BT_STATUS_SUCCESS;
 }
 
@@ -1032,12 +1020,20 @@ bt_status_t HeadsetInterface::ClccResponse(
         dialnum[newidx++] = '+';
       }
       for (size_t i = 0; number[i] != 0; i++) {
+        if (newidx >= (sizeof(dialnum) - res_strlen - 1)) {
+          android_errorWriteLog(0x534e4554, "79266386");
+          break;
+        }
         if (utl_isdialchar(number[i])) {
           dialnum[newidx++] = number[i];
         }
       }
       dialnum[newidx] = 0;
-      snprintf(&ag_res.str[res_strlen], rem_bytes, ",\"%s\",%d", dialnum, type);
+      // Reserve 5 bytes for ["][,][3_digit_type]
+      snprintf(&ag_res.str[res_strlen], rem_bytes - 5, ",\"%s", dialnum);
+      std::stringstream remaining_string;
+      remaining_string << "\"," << type;
+      strncat(&ag_res.str[res_strlen], remaining_string.str().c_str(), 5);
     }
   }
   BTA_AgResult(btif_hf_cb[idx].handle, BTA_AG_CLCC_RES, ag_res);
@@ -1184,6 +1180,13 @@ bt_status_t HeadsetInterface::PhoneStateChange(
           else
             xx = snprintf(ag_res.str, sizeof(ag_res.str), "\"%s\"", number);
           ag_res.num = type;
+          // 5 = [,][3_digit_type][null_terminator]
+          if (xx > static_cast<int>(sizeof(ag_res.str) - 5)) {
+            android_errorWriteLog(0x534e4554, "79431031");
+            xx = sizeof(ag_res.str) - 5;
+            // Null terminating the string
+            memset(&ag_res.str[xx], 0, 5);
+          }
 
           if (res == BTA_AG_CALL_WAIT_RES)
             snprintf(&ag_res.str[xx], sizeof(ag_res.str) - xx, ",%d", type);

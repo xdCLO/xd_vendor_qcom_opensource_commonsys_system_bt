@@ -32,6 +32,7 @@
 #include "btu.h"
 #include "device/include/controller.h"
 #include "hcimsgs.h"
+#include "l2c_api.h"
 #include "l2c_int.h"
 #include "l2cdefs.h"
 #include "log/log.h"
@@ -54,11 +55,19 @@ static void l2cble_start_conn_update(tL2C_LCB* p_lcb);
  *
  ******************************************************************************/
 bool L2CA_CancelBleConnectReq(const RawAddress& rem_bda) {
-  tL2C_LCB* p_lcb;
-
+  tL2C_LCB* p_lcb = l2cu_find_lcb_by_bd_addr(rem_bda, BT_TRANSPORT_LE);
   /* There can be only one BLE connection request outstanding at a time */
   if (btm_ble_get_conn_st() == BLE_CONN_IDLE) {
     L2CAP_TRACE_WARNING("%s - no connection pending", __func__);
+    tACL_CONN* p_acl = btm_bda_to_acl(rem_bda, BT_TRANSPORT_LE);
+    if (p_acl) {
+      if (p_lcb != NULL &&
+          p_lcb->link_state == LST_CONNECTING && !l2cb.is_ble_connecting) {
+        L2CAP_TRACE_WARNING("%s - disconnecting the LE link", __func__);
+        L2CA_RemoveFixedChnl(L2CAP_ATT_CID, rem_bda);
+        return (true);
+      }
+    }
     return (false);
   }
 
@@ -73,7 +82,6 @@ bool L2CA_CancelBleConnectReq(const RawAddress& rem_bda) {
 
   btsnd_hcic_ble_create_conn_cancel();
 
-  p_lcb = l2cu_find_lcb_by_bd_addr(rem_bda, BT_TRANSPORT_LE);
   /* Do not remove lcb if an LE link is already up as a peripheral */
   if (p_lcb != NULL &&
       !(p_lcb->link_role == HCI_ROLE_SLAVE &&
@@ -594,6 +602,12 @@ void l2cble_process_sig_cmd(tL2C_LCB* p_lcb, uint8_t* p, uint16_t pkt_len) {
   uint16_t credit;
   p_pkt_end = p + pkt_len;
 
+  if (p + 4 > p_pkt_end) {
+    android_errorWriteLog(0x534e4554, "80261585");
+    LOG(ERROR) << "invalid read";
+    return;
+  }
+
   STREAM_TO_UINT8(cmd_code, p);
   STREAM_TO_UINT8(id, p);
   STREAM_TO_UINT16(cmd_len, p);
@@ -619,6 +633,12 @@ void l2cble_process_sig_cmd(tL2C_LCB* p_lcb, uint8_t* p, uint16_t pkt_len) {
       break;
 
     case L2CAP_CMD_BLE_UPDATE_REQ:
+      if (p + 8 > p_pkt_end) {
+        android_errorWriteLog(0x534e4554, "80261585");
+        LOG(ERROR) << "invalid read";
+        return;
+      }
+
       STREAM_TO_UINT16(min_interval, p); /* 0x0006 - 0x0C80 */
       STREAM_TO_UINT16(max_interval, p); /* 0x0006 - 0x0C80 */
       STREAM_TO_UINT16(latency, p);      /* 0x0000 - 0x03E8 */
@@ -660,6 +680,12 @@ void l2cble_process_sig_cmd(tL2C_LCB* p_lcb, uint8_t* p, uint16_t pkt_len) {
       break;
 
     case L2CAP_CMD_BLE_CREDIT_BASED_CONN_REQ:
+      if (p + 10 > p_pkt_end) {
+        android_errorWriteLog(0x534e4554, "80261585");
+        LOG(ERROR) << "invalid read";
+        return;
+      }
+
       STREAM_TO_UINT16(con_info.psm, p);
       STREAM_TO_UINT16(rcid, p);
       STREAM_TO_UINT16(mtu, p);
@@ -743,6 +769,12 @@ void l2cble_process_sig_cmd(tL2C_LCB* p_lcb, uint8_t* p, uint16_t pkt_len) {
       }
       if (p_ccb) {
         L2CAP_TRACE_DEBUG("I remember the connection req");
+        if (p + 10 > p_pkt_end) {
+          android_errorWriteLog(0x534e4554, "80261585");
+          LOG(ERROR) << "invalid read";
+          return;
+        }
+
         STREAM_TO_UINT16(p_ccb->remote_cid, p);
         STREAM_TO_UINT16(p_ccb->peer_conn_cfg.mtu, p);
         STREAM_TO_UINT16(p_ccb->peer_conn_cfg.mps, p);
@@ -788,6 +820,12 @@ void l2cble_process_sig_cmd(tL2C_LCB* p_lcb, uint8_t* p, uint16_t pkt_len) {
       break;
 
     case L2CAP_CMD_BLE_FLOW_CTRL_CREDIT:
+      if (p + 4 > p_pkt_end) {
+        android_errorWriteLog(0x534e4554, "80261585");
+        LOG(ERROR) << "invalid read";
+        return;
+      }
+
       STREAM_TO_UINT16(lcid, p);
       p_ccb = l2cu_find_ccb_by_remote_cid(p_lcb, lcid);
       if (p_ccb == NULL) {
@@ -821,6 +859,11 @@ void l2cble_process_sig_cmd(tL2C_LCB* p_lcb, uint8_t* p, uint16_t pkt_len) {
       break;
 
     case L2CAP_CMD_DISC_RSP:
+      if (p + 4 > p_pkt_end) {
+        android_errorWriteLog(0x534e4554, "80261585");
+        LOG(ERROR) << "invalid read";
+        return;
+      }
       STREAM_TO_UINT16(rcid, p);
       STREAM_TO_UINT16(lcid, p);
 
