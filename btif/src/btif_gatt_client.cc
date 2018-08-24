@@ -41,7 +41,6 @@
 #include <hardware/bt_gatt.h>
 
 #include "bta_api.h"
-#include "bta_closure_api.h"
 #include "bta_gatt_api.h"
 #include "btif_config.h"
 #include "btif_dm.h"
@@ -49,6 +48,7 @@
 #include "btif_gatt_util.h"
 #include "btif_storage.h"
 #include "osi/include/log.h"
+#include "stack/include/btu.h"
 #include "vendor_api.h"
 
 using base::Bind;
@@ -161,6 +161,9 @@ void btif_gattc_upstreams_evt(uint16_t event, char* p_param) {
     case BTA_GATTC_ACL_EVT:
       LOG_DEBUG(LOG_TAG, "BTA_GATTC_ACL_EVT: status = %d", p_data->status);
       /* Ignore for now */
+      break;
+
+    case BTA_GATTC_SEARCH_RES_EVT:
       break;
 
     case BTA_GATTC_CANCEL_OPEN_EVT:

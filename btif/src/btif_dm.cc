@@ -47,7 +47,6 @@
 
 #include "advertise_data_parser.h"
 #include "bt_common.h"
-#include "bta_closure_api.h"
 #include "bta_gatt_api.h"
 #include "btif_api.h"
 #include "btif_av.h"
@@ -97,8 +96,9 @@ const Uuid UUID_HEARING_AID = Uuid::FromString("FDF0");
 #define BTIF_DM_MAX_SDP_ATTEMPTS_AFTER_PAIRING 2
 
 #define NUM_TIMEOUT_RETRIES 5
-
+#ifndef PROPERTY_PRODUCT_MODEL
 #define PROPERTY_PRODUCT_MODEL "ro.product.model"
+#endif
 #define DEFAULT_LOCAL_NAME_MAX 31
 #if (DEFAULT_LOCAL_NAME_MAX > BTM_MAX_LOC_BD_NAME_LEN)
 #error "default btif local name size exceeds stack supported length"
@@ -1397,10 +1397,15 @@ static void btif_dm_search_services_evt(uint16_t event, char* p_param) {
       if ((p_data->disc_res.result != BTA_SUCCESS) &&
           (pairing_cb.state == BT_BOND_STATE_BONDING) &&
           (pairing_cb.sdp_attempts < BTIF_DM_MAX_SDP_ATTEMPTS_AFTER_PAIRING)) {
-        BTIF_TRACE_WARNING("%s:SDP failed after bonding re-attempting",
-                           __func__);
-        pairing_cb.sdp_attempts++;
-        btif_dm_get_remote_services(bd_addr);
+        if (pairing_cb.sdp_attempts) {
+          BTIF_TRACE_WARNING("%s: SDP failed after bonding re-attempting",
+                             __func__);
+          pairing_cb.sdp_attempts++;
+          btif_dm_get_remote_services(bd_addr);
+        } else {
+          BTIF_TRACE_WARNING("%s: SDP triggered by someone failed when bonding",
+                             __func__);
+        }
         return;
       }
       prop.type = BT_PROPERTY_UUIDS;
