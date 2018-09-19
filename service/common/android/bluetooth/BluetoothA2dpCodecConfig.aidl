@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,25 +14,6 @@
  * limitations under the License.
  */
 
-#include "execution_barrier.h"
+package android.bluetooth;
 
-namespace bluetooth {
-
-namespace common {
-
-void ExecutionBarrier::WaitForExecution() {
-  std::unique_lock<std::mutex> lock(execution_mutex_);
-  while (!finished_) {
-    execution_cv_.wait(lock);
-  }
-}
-
-void ExecutionBarrier::NotifyFinished() {
-  std::unique_lock<std::mutex> lock(execution_mutex_);
-  finished_ = true;
-  execution_cv_.notify_all();
-}
-
-}  // namespace common
-
-}  // namespace bluetooth
+parcelable BluetoothA2dpCodecConfig cpp_header "android/bluetooth/bluetooth_a2dp_codec_config.h";
