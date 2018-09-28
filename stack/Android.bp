@@ -214,6 +214,7 @@ cc_test {
     static_libs: [
         "libbt-bta",
         "libbt-stack",
+        "libbt-common",
         "libbt-sbc-decoder",
         "libbt-sbc-encoder",
         "libFraunhoferAAC",
@@ -275,6 +276,9 @@ cc_test {
         "libosi",
         "libbt-protos-lite",
     ],
+    sanitize: {
+        cfi: false,
+    },
 }
 
 // Bluetooth stack smp unit tests for target
@@ -393,6 +397,7 @@ cc_test {
         "libprotobuf-cpp-lite",
     ],
     static_libs: [
+        "libbt-common",
         "libbluetooth-types",
         "libgmock",
         "libosi",
