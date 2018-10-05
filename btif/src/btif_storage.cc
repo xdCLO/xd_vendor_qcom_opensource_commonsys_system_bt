@@ -682,6 +682,7 @@ bt_status_t btif_storage_get_adapter_property(bt_property_t* property) {
                 Uuid::From16Bit(UUID_SERVCLASS_AG_HANDSFREE);
             num_uuids++;
           }
+            FALLTHROUGH_INTENDED; /* FALLTHROUGH */
           /* intentional fall through: Send both BFP & HSP UUIDs if HFP is
            * enabled */
           case BTA_HSP_SERVICE_ID: {
@@ -1523,7 +1524,7 @@ void btif_storage_load_bonded_hearing_aids() {
     RawAddress bd_addr;
     RawAddress::FromString(name, bd_addr);
     // add extracted information to BTA Hearing Aid
-    do_in_bta_thread(
+    do_in_main_thread(
         FROM_HERE,
         Bind(&HearingAid::AddFromStorage, bd_addr, psm, capabilities, codecs,
              audio_control_point_handle, volume_handle, hi_sync_id,
