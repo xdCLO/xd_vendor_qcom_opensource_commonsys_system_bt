@@ -67,6 +67,9 @@ constexpr uint8_t CONTROL_POINT_OP_STOP = 0x02;
 constexpr int8_t VOLUME_UNKNOWN = 127;
 constexpr int8_t VOLUME_MIN = -127;
 
+// audio type
+constexpr uint8_t AUDIOTYPE_UNKNOWN = 0x00;
+
 namespace {
 
 // clang-format off
@@ -396,7 +399,7 @@ class HearingAidImpl : public HearingAid {
 
     // Set data length
     // TODO(jpawlowski: for 16khz only 87 is required, optimize
-    BTM_SetBleDataLength(address, 168);
+    BTM_SetBleDataLength(address, 167);
 
     tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(address);
     if (p_dev_rec) {
@@ -826,23 +829,13 @@ class HearingAidImpl : public HearingAid {
 
   void SendStart(const HearingDevice& device) {
     std::vector<uint8_t> start({CONTROL_POINT_OP_START, codec_in_use,
-                                0x02 /* media */, (uint8_t)current_volume});
+                                AUDIOTYPE_UNKNOWN, (uint8_t)current_volume});
 
     if (current_volume == VOLUME_UNKNOWN) start[3] = (uint8_t)VOLUME_MIN;
 
     BtaGattQueue::WriteCharacteristic(device.conn_id,
                                       device.audio_control_point_handle, start,
                                       GATT_WRITE, nullptr, nullptr);
-
-    // TODO(jpawlowski): this will be removed, once test devices get volume
-    // from start reqest
-    if (current_volume != VOLUME_UNKNOWN) {
-      std::vector<uint8_t> volume_value(
-          {static_cast<unsigned char>(current_volume)});
-      BtaGattQueue::WriteCharacteristic(device.conn_id, device.volume_handle,
-                                        volume_value, GATT_WRITE_NO_RSP,
-                                        nullptr, nullptr);
-    }
   }
 
   void OnAudioDataReady(const std::vector<uint8_t>& data) {
@@ -1115,6 +1108,8 @@ class HearingAidImpl : public HearingAid {
     // cancel autoconnect
     BTA_GATTC_CancelOpen(gatt_if, address, false);
 
+    DoDisconnectCleanUp(hearingDevice);
+
     hearingDevices.Remove(address);
 
     if (connected)
@@ -1126,26 +1121,31 @@ class HearingAidImpl : public HearingAid {
                           tBTA_GATT_REASON reason) {
     HearingDevice* hearingDevice = hearingDevices.FindByConnId(conn_id);
     if (!hearingDevice) {
-      VLOG(2) << "Skipping unknown device disconnect, conn_id=" << conn_id;
+      VLOG(2) << "Skipping unknown device disconnect, conn_id="
+              << loghex(conn_id);
       return;
     }
 
+    DoDisconnectCleanUp(hearingDevice);
+
+    callbacks->OnConnectionState(ConnectionState::DISCONNECTED, remote_bda);
+  }
+
+  void DoDisconnectCleanUp(HearingDevice* hearingDevice) {
     if (hearingDevice->connection_update_status != NONE) {
       LOG(INFO) << __func__ << ": connection update not completed. Current="
                 << hearingDevice->connection_update_status;
 
       if (hearingDevice->connection_update_status == STARTED) {
-        OnConnectionUpdateComplete(conn_id);
+        OnConnectionUpdateComplete(hearingDevice->conn_id);
       }
       hearingDevice->connection_update_status = NONE;
     }
 
+    BtaGattQueue::Clean(hearingDevice->conn_id);
+
     hearingDevice->accepting_audio = false;
     hearingDevice->conn_id = 0;
-
-    BtaGattQueue::Clean(conn_id);
-
-    callbacks->OnConnectionState(ConnectionState::DISCONNECTED, remote_bda);
   }
 
   void SetVolume(int8_t volume) override {
