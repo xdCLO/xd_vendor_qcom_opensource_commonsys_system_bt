@@ -8,11 +8,15 @@ cc_library_static {
     ],
     // TODO (b/121280692) address_obfuscator.cc still reverted
     srcs: [
+        "address_obfuscator.cc",
         "message_loop_thread.cc",
         "metrics.cc",
         "once_timer.cc",
         "repeating_timer.cc",
         "time_util.cc",
+    ],
+    shared_libs: [
+        "libcrypto",
     ],
     static_libs: [
         "libbt-protos-lite",
@@ -29,6 +33,7 @@ cc_test {
         "system/bt/stack/include",
     ],
     srcs : [
+        "address_obfuscator_unittest.cc",
         "leaky_bonded_queue_unittest.cc",
         "message_loop_thread_unittest.cc",
         "metrics_unittest.cc",
@@ -40,6 +45,7 @@ cc_test {
     ],
     shared_libs: [
         "libprotobuf-cpp-lite",
+        "libcrypto",
     ],
     static_libs : [
         "libgmock",

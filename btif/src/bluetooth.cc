@@ -62,6 +62,7 @@
 #include "btif_storage.h"
 #include "btsnoop.h"
 #include "btsnoop_mem.h"
+#include "common/address_obfuscator.h"
 #include "common/metrics.h"
 #include "device/include/interop.h"
 #include "osi/include/alarm.h"
@@ -440,6 +441,11 @@ static bluetooth::avrcp::ServiceInterface* get_avrcp_service(void) {
   return bluetooth::avrcp::AvrcpService::GetServiceInterface();
 }
 
+static std::string obfuscate_address(const RawAddress& address) {
+  return bluetooth::common::AddressObfuscator::GetInstance()->Obfuscate(
+      address);
+}
+
 EXPORT_SYMBOL bt_interface_t bluetoothInterface = {
     sizeof(bluetoothInterface),
     init,
@@ -475,4 +481,5 @@ EXPORT_SYMBOL bt_interface_t bluetoothInterface = {
     interop_database_clear,
     interop_database_add,
     get_avrcp_service,
+    obfuscate_address,
 };
