@@ -364,44 +364,7 @@ extern bool BTM_ReadRemoteConnectionAddr(const RawAddress& pseudo_addr,
  ******************************************************************************/
 extern void BTM_BleLoadLocalKeys(uint8_t key_type, tBTM_BLE_LOCAL_KEYS* p_key);
 
-/**
- * Set BLE connectable mode to auto connect
- */
-extern void BTM_BleStartAutoConn();
-
-/*******************************************************************************
- *
- * Function         BTM_BleUpdateBgConnDev
- *
- * Description      This function is called to add or remove a device into/from
- *                  background connection procedure. The background connection
-*                   procedure is decided by the background connection type, it
-*can be
-*                   auto connection, or selective connection.
- *
- * Parameters       add_remove: true to add; false to remove.
- *                  remote_bda: device address to add/remove.
- *
- * Returns          void
- *
- ******************************************************************************/
-extern bool BTM_BleUpdateBgConnDev(bool add_remove,
-                                   const RawAddress& remote_bda);
-
-/*******************************************************************************
- *
- * Function         BTM_BleClearBgConnDev
- *
- * Description      This function is called to clear the whitelist,
- *                  end any pending whitelist connections,
- *                  and reset the local bg device list.
- *
- * Parameters       void
- *
- * Returns          void
- *
- ******************************************************************************/
-extern void BTM_BleClearBgConnDev(void);
+#include "stack/btm/btm_ble_bgconn.h"
 
 /********************************************************
  *

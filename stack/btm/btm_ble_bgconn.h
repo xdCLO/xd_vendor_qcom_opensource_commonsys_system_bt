@@ -15,19 +15,18 @@
  *  limitations under the License.
  *
  ******************************************************************************/
-#pragma once
 
-/* This file provides empty implementation of android_errorWriteLog, which is
- * not required on linux. It should be on include path only for linux build. */
+#include "types/raw_address.h"
 
-#if defined(OS_GENERIC)
+/** Set BLE connectable mode to auto connect */
+extern void BTM_BleStartAutoConn();
 
-#include <cstdint>
+/** Adds the device into white list. Returns false if white list is full and
+ * device can't be added, true otherwise. */
+extern bool BTM_WhiteListAdd(const RawAddress& address);
 
-inline int android_errorWriteLog(int, const char*) { return 0; };
-inline int android_errorWriteWithInfoLog(int tag, const char* subTag,
-                                         int32_t uid, const char* data,
-                                         uint32_t dataLen) {
-  return 0;
-};
-#endif
+/** Removes the device from white list */
+extern void BTM_WhiteListRemove(const RawAddress& address);
+
+/** Clear the whitelist, end any pending whitelist connections */
+extern void BTM_WhiteListClear();

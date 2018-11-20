@@ -47,6 +47,7 @@
 #include "osi/include/log.h"
 #include "osi/include/osi.h"
 #include "sdp_api.h"
+#include "stack/gatt/connection_manager.h"
 #include "utl.h"
 
 #if (GAP_INCLUDED == TRUE)
@@ -477,7 +478,7 @@ void bta_dm_disable() {
   bta_dm_disable_search_and_disc();
   bta_dm_cb.disabling = true;
 
-  BTM_BleClearBgConnDev();
+  gatt::connection_manager::reset(false);
 
   if (BTM_GetNumAclLinks() == 0) {
 #if (BTA_DISABLE_DELAY > 0)
