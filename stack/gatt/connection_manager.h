@@ -15,19 +15,30 @@
  *  limitations under the License.
  *
  ******************************************************************************/
+
 #pragma once
 
-/* This file provides empty implementation of android_errorWriteLog, which is
- * not required on linux. It should be on include path only for linux build. */
+#include <set>
 
-#if defined(OS_GENERIC)
+#include "types/raw_address.h"
 
-#include <cstdint>
+typedef uint8_t tGATT_IF;
 
-inline int android_errorWriteLog(int, const char*) { return 0; };
-inline int android_errorWriteWithInfoLog(int tag, const char* subTag,
-                                         int32_t uid, const char* data,
-                                         uint32_t dataLen) {
-  return 0;
-};
-#endif
+namespace gatt {
+namespace connection_manager {
+
+/* for background connection */
+extern bool background_connect_add(tGATT_IF gatt_if, const RawAddress& bd_addr);
+extern bool background_connect_remove(tGATT_IF gatt_if,
+                                      const RawAddress& bd_addr);
+extern bool background_connect_remove_unconditional(const RawAddress& bd_addr);
+
+extern void reset(bool after_reset);
+
+extern void on_app_deregistered(tGATT_IF gatt_if);
+
+extern std::set<tGATT_IF> get_apps_connecting_to(const RawAddress& remote_bda);
+
+extern void dump(int fd);
+}  // namespace connection_manager
+}  // namespace gatt
