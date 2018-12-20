@@ -29,11 +29,13 @@
 #include <base/base64.h>
 #include <base/logging.h>
 #include <include/hardware/bt_av.h>
+#include <statslog.h>
 
 #include "bluetooth/metrics/bluetooth.pb.h"
 #include "osi/include/osi.h"
 #include "stack/include/btm_api_types.h"
 
+#include "address_obfuscator.h"
 #include "leaky_bonded_queue.h"
 #include "metrics.h"
 #include "time_util.h"
@@ -572,6 +574,34 @@ void LogSdpAttribute(const RawAddress& address, uint16_t protocol_uuid,
   // TODO (b/124229503) This is a no-op placeholder to reduce the number of
   // reverts. This function is properly defined in
   // 9d9df72cf3e2215af34c8be1e1c935b097853b85
+}
+
+void LogLinkLayerConnectionEvent(const RawAddress* address,
+                                 uint32_t connection_handle,
+                                 android::bluetooth::DirectionEnum direction,
+                                 uint32_t link_type, uint32_t hci_cmd,
+                                 uint32_t hci_event, uint32_t hci_ble_event,
+                                 uint32_t cmd_status, uint32_t reason_code) {
+  std::string obfuscated_id;
+  if (address != nullptr) {
+    obfuscated_id = AddressObfuscator::GetInstance()->Obfuscate(*address);
+  }
+  // nullptr and size 0 represent missing value for obfuscated_id
+  android::util::BytesField bytes_field(
+      address != nullptr ? obfuscated_id.c_str() : nullptr,
+      address != nullptr ? obfuscated_id.size() : 0);
+  int ret = android::util::stats_write(
+      android::util::BLUETOOTH_LINK_LAYER_CONNECTION_EVENT, bytes_field,
+      connection_handle, direction, link_type, hci_cmd, hci_event,
+      hci_ble_event, cmd_status, reason_code);
+  if (ret < 0) {
+    LOG(WARNING) << __func__ << ": failed to log status 0x"
+                 << loghex(cmd_status) << ", reason 0x" << loghex(reason_code)
+                 << " from cmd 0x" << loghex(hci_cmd) << ", event 0x"
+                 << loghex(hci_event) << ", ble_event 0x"
+                 << loghex(hci_ble_event) << " for " << address << ", handle "
+                 << connection_handle << ", error " << ret;
+  }
 }
 
 }  // namespace common
