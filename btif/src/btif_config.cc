@@ -114,7 +114,7 @@ bool btif_get_address_type(const RawAddress& bda, int* p_addr_type) {
   return true;
 }
 
-static std::mutex config_lock;  // protects operations on |config|.
+static std::recursive_mutex config_lock;  // protects operations on |config|.
 static std::unique_ptr<config_t> config;
 static alarm_t* config_timer;
 
@@ -325,7 +325,11 @@ bool btif_config_get_bin(const std::string& section, const std::string& key,
   std::unique_lock<std::mutex> lock(config_lock);
   const std::string* value_str = config_get_string(*config, section, key, NULL);
 
-  if (!value_str) return false;
+  if (!value_str) {
+    VLOG(1) << __func__ << ": cannot find string for section " << section
+            << ", key " << key;
+    return false;
+  }
 
   size_t value_len = value_str->length();
   if ((value_len % 2) != 0 || *length < (value_len / 2)) return false;

@@ -696,17 +696,6 @@ bool BTM_BleLocalPrivacyEnabled(void) {
 #endif
 }
 
-/** Set BLE connectable mode to auto connect */
-void BTM_BleStartAutoConn() {
-  BTM_TRACE_EVENT("%s", __func__);
-  if (!controller_get_interface()->supports_ble()) return;
-
-  if (btm_cb.ble_ctr_cb.bg_conn_type != BTM_BLE_CONN_AUTO) {
-    btm_ble_start_auto_conn();
-    btm_cb.ble_ctr_cb.bg_conn_type = BTM_BLE_CONN_AUTO;
-  }
-}
-
 /*******************************************************************************
  *
  * Function         BTM_BleSetConnectableMode
@@ -2491,8 +2480,7 @@ void btm_ble_update_mode_operation(uint8_t link_role, const RawAddress* bd_addr,
      now in order */
   if (btm_ble_get_conn_st() == BLE_CONN_IDLE &&
       status != HCI_ERR_HOST_REJECT_RESOURCES &&
-      status != HCI_ERR_MAX_NUM_OF_CONNECTIONS &&
-      !btm_send_pending_direct_conn()) {
+      status != HCI_ERR_MAX_NUM_OF_CONNECTIONS) {
     btm_ble_resume_bg_conn();
   }
 }
@@ -2519,7 +2507,6 @@ void btm_ble_init(void) {
 
   p_cb->observer_timer = alarm_new("btm_ble.observer_timer");
   p_cb->cur_states = 0;
-  p_cb->conn_pending_q = fixed_queue_new(SIZE_MAX);
 
   p_cb->inq_var.adv_mode = BTM_BLE_ADV_DISABLE;
   p_cb->inq_var.scan_type = BTM_BLE_SCAN_MODE_NONE;

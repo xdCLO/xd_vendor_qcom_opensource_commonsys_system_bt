@@ -258,7 +258,7 @@ bool l2c_link_hci_conn_comp(uint8_t status, uint16_t handle,
          * controller */
         p_lcb->link_state = LST_CONNECTING;
       } else {
-        l2cu_create_conn(p_lcb, BT_TRANSPORT_BR_EDR);
+        l2cu_create_conn_br_edr(p_lcb);
       }
     }
   }
@@ -388,11 +388,9 @@ bool l2c_link_hci_disc_comp(uint16_t handle, uint8_t reason) {
       p_ccb = pn;
     }
 
-#if (BTM_SCO_INCLUDED == TRUE)
     if (p_lcb->transport == BT_TRANSPORT_BR_EDR)
       /* Tell SCO management to drop any SCOs on this ACL */
       btm_sco_acl_removed(&p_lcb->remote_bd_addr);
-#endif
 
     /* If waiting for disconnect and reconnect is pending start the reconnect
        now
@@ -413,7 +411,6 @@ bool l2c_link_hci_disc_comp(uint16_t handle, uint8_t reason) {
       /* for LE link, always drop and re-open to ensure to get LE remote feature
        */
       if (p_lcb->transport == BT_TRANSPORT_LE) {
-        l2cb.is_ble_connecting = false;
         btm_acl_removed(p_lcb->remote_bd_addr, p_lcb->transport);
       } else {
 #if (L2CAP_NUM_FIXED_CHNLS > 0)
@@ -446,8 +443,13 @@ bool l2c_link_hci_disc_comp(uint16_t handle, uint8_t reason) {
         }
 #endif
       }
-      if (l2cu_create_conn(p_lcb, transport))
-        lcb_is_free = false; /* still using this lcb */
+      if (p_lcb->transport == BT_TRANSPORT_LE) {
+        if (l2cu_create_conn_le(p_lcb))
+          lcb_is_free = false; /* still using this lcb */
+      } else {
+        if (l2cu_create_conn_br_edr(p_lcb))
+          lcb_is_free = false; /* still using this lcb */
+      }
     }
 
     p_lcb->p_pending_ccb = NULL;
@@ -460,7 +462,7 @@ bool l2c_link_hci_disc_comp(uint16_t handle, uint8_t reason) {
   if (lcb_is_free &&
       ((p_lcb = l2cu_find_lcb_by_state(LST_CONNECT_HOLDING)) != NULL)) {
     /* we found one-- create a connection */
-    l2cu_create_conn(p_lcb, BT_TRANSPORT_BR_EDR);
+    l2cu_create_conn_br_edr(p_lcb);
   }
 
   return status;
@@ -529,9 +531,7 @@ void l2c_link_timeout(tL2C_LCB* p_lcb) {
 
       p_ccb = pn;
     }
-    if (p_lcb->link_state == LST_CONNECTING && l2cb.is_ble_connecting) {
-      L2CA_CancelBleConnectReq(l2cb.ble_connecting_bda);
-    }
+
     /* Release the LCB */
     l2cu_release_lcb(p_lcb);
   }

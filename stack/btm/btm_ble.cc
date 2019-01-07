@@ -43,6 +43,7 @@
 #include "osi/include/log.h"
 #include "osi/include/osi.h"
 #include "stack/crypto_toolbox/crypto_toolbox.h"
+#include "stack/gatt/connection_manager.h"
 
 extern void gatt_notify_phy_updated(uint8_t status, uint16_t handle,
                                     uint8_t tx_phy, uint8_t rx_phy);
@@ -1923,15 +1924,21 @@ void btm_ble_conn_complete(uint8_t* p, UNUSED_ATTR uint16_t evt_len,
 
 #if (BLE_PRIVACY_SPT == TRUE)
     peer_addr_type = bda_type;
+    bool addr_is_rpa =
+        (peer_addr_type == BLE_ADDR_RANDOM && BTM_BLE_IS_RESOLVE_BDA(bda));
 
-    if (peer_addr_type & BLE_ADDR_TYPE_ID_BIT) {
+    /* We must translate whatever address we received into the "pseudo" address.
+     * i.e. if we bonded with device that was using RPA for first connection,
+     * "pseudo" address is equal to this RPA. If it later decides to use Public
+     * address, or Random Static Address, we convert it into the "pseudo"
+     * address here. */
+    if (!addr_is_rpa || peer_addr_type & BLE_ADDR_TYPE_ID_BIT) {
       match = btm_identity_addr_to_random_pseudo(&bda, &bda_type, true);
     }
 
     /* possiblly receive connection complete with resolvable random while
        the device has been paired */
-    if (!match && peer_addr_type == BLE_ADDR_RANDOM &&
-        BTM_BLE_IS_RESOLVE_BDA(bda)) {
+    if (!match && addr_is_rpa) {
       tBTM_SEC_DEV_REC* match_rec = btm_ble_resolve_random_addr(bda);
       if (match_rec) {
         LOG_INFO(LOG_TAG, "%s matched and resolved random address", __func__);
@@ -1951,6 +1958,11 @@ void btm_ble_conn_complete(uint8_t* p, UNUSED_ATTR uint16_t evt_len,
     }
 #endif
 
+    if (role == HCI_ROLE_MASTER) {
+      btm_ble_set_conn_st(BLE_CONN_IDLE);
+    }
+
+    connection_manager::on_connection_complete(bda);
     btm_ble_connected(bda, handle, HCI_ENCRYPT_MODE_DISABLED, role, bda_type,
                       match);
 

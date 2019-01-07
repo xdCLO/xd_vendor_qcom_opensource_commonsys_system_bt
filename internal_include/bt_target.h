@@ -275,11 +275,6 @@
 #define BTM_NO_SSP_ON_INQUIRY FALSE
 #endif
 
-/* Includes SCO if TRUE */
-#ifndef BTM_SCO_INCLUDED
-#define BTM_SCO_INCLUDED TRUE /* TRUE includes SCO code */
-#endif
-
 #ifndef DISABLE_WBS
 #define DISABLE_WBS FALSE
 #endif
@@ -665,6 +660,11 @@
 #ifndef GATT_MAX_APPS
 #define GATT_MAX_APPS 32 /* note: 2 apps used internally GATT and GAP */
 #endif
+
+/* connection manager doesn't generate it's own IDs. Instead, all GATT clients
+ * use their gatt_if to identify against conection manager. When stack tries to
+ * create l2cap connection, it will use this fixed ID. */
+#define CONN_MGR_ID_L2CAP (GATT_MAX_APPS + 10)
 
 #ifndef GATT_MAX_PHY_CHANNEL
 #define GATT_MAX_PHY_CHANNEL 7

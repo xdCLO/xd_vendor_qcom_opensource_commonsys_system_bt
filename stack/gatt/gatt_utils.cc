@@ -1084,15 +1084,8 @@ void gatt_sr_update_prep_cnt(tGATT_TCB& tcb, tGATT_IF gatt_if, bool is_inc,
     }
   }
 }
-/*******************************************************************************
- *
- * Function         gatt_cancel_open
- *
- * Description      Cancel open request
- *
- * Returns         Boolean
- *
- ******************************************************************************/
+
+/** Cancel LE Create Connection request */
 bool gatt_cancel_open(tGATT_IF gatt_if, const RawAddress& bda) {
   tGATT_TCB* p_tcb = gatt_find_tcb_by_addr(bda, BT_TRANSPORT_LE);
   if (!p_tcb) return true;
@@ -1106,6 +1099,7 @@ bool gatt_cancel_open(tGATT_IF gatt_if, const RawAddress& bda) {
 
   if (p_tcb->app_hold_link.empty()) gatt_disconnect(p_tcb);
 
+  connection_manager::direct_connect_remove(gatt_if, bda);
   return true;
 }
 
@@ -1300,5 +1294,5 @@ uint8_t* gatt_dbg_op_name(uint8_t op_code) {
 bool gatt_auto_connect_dev_remove(tGATT_IF gatt_if, const RawAddress& bd_addr) {
   tGATT_TCB* p_tcb = gatt_find_tcb_by_addr(bd_addr, BT_TRANSPORT_LE);
   if (p_tcb) gatt_update_app_use_link_flag(gatt_if, p_tcb, false, false);
-  return gatt::connection_manager::background_connect_remove(gatt_if, bd_addr);
+  return connection_manager::background_connect_remove(gatt_if, bd_addr);
 }
