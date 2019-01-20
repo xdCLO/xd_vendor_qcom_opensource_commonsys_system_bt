@@ -114,14 +114,14 @@ bool btif_get_address_type(const RawAddress& bda, int* p_addr_type) {
   return true;
 }
 
-static std::mutex config_lock;  // protects operations on |config|.
+static std::recursive_mutex config_lock;  // protects operations on |config|.
 static std::unique_ptr<config_t> config;
 static alarm_t* config_timer;
 
 // Module lifecycle functions
 
 static future_t* init(void) {
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
 
   if (is_factory_reset()) delete_config_files();
 
@@ -219,7 +219,7 @@ static future_t* clean_up(void) {
   alarm_free(config_timer);
   config_timer = NULL;
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   config.reset();
   return future_new_immediate(FUTURE_SUCCESS);
 }
@@ -234,14 +234,14 @@ bool btif_config_has_section(const char* section) {
   CHECK(config != NULL);
   CHECK(section != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   return config_has_section(*config, section);
 }
 
 bool btif_config_exist(const std::string& section, const std::string& key) {
   CHECK(config != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   return config_has_key(*config, section, key);
 }
 
@@ -250,7 +250,7 @@ bool btif_config_get_int(const std::string& section, const std::string& key,
   CHECK(config != NULL);
   CHECK(value != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   bool ret = config_has_key(*config, section, key);
   if (ret) *value = config_get_int(*config, section, key, *value);
 
@@ -261,7 +261,7 @@ bool btif_config_set_int(const std::string& section, const std::string& key,
                          int value) {
   CHECK(config != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   config_set_int(config.get(), section, key, value);
 
   return true;
@@ -272,7 +272,7 @@ bool btif_config_get_uint64(const std::string& section, const std::string& key,
   CHECK(config != NULL);
   CHECK(value != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   bool ret = config_has_key(*config, section, key);
   if (ret) *value = config_get_uint64(*config, section, key, *value);
 
@@ -283,7 +283,7 @@ bool btif_config_set_uint64(const std::string& section, const std::string& key,
                             uint64_t value) {
   CHECK(config != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   config_set_uint64(config.get(), section, key, value);
 
   return true;
@@ -296,7 +296,7 @@ bool btif_config_get_str(const std::string& section, const std::string& key,
   CHECK(size_bytes != NULL);
 
   {
-    std::unique_lock<std::mutex> lock(config_lock);
+    std::unique_lock<std::recursive_mutex> lock(config_lock);
     const std::string* stored_value =
         config_get_string(*config, section, key, NULL);
     if (!stored_value) return false;
@@ -311,7 +311,7 @@ bool btif_config_set_str(const std::string& section, const std::string& key,
                          const std::string& value) {
   CHECK(config != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   config_set_string(config.get(), section, key, value);
   return true;
 }
@@ -322,10 +322,14 @@ bool btif_config_get_bin(const std::string& section, const std::string& key,
   CHECK(value != NULL);
   CHECK(length != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   const std::string* value_str = config_get_string(*config, section, key, NULL);
 
-  if (!value_str) return false;
+  if (!value_str) {
+    VLOG(1) << __func__ << ": cannot find string for section " << section
+            << ", key " << key;
+    return false;
+  }
 
   size_t value_len = value_str->length();
   if ((value_len % 2) != 0 || *length < (value_len / 2)) return false;
@@ -344,7 +348,7 @@ size_t btif_config_get_bin_length(const std::string& section,
                                   const std::string& key) {
   CHECK(config != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   const std::string* value_str = config_get_string(*config, section, key, NULL);
   if (!value_str) return 0;
 
@@ -368,7 +372,7 @@ bool btif_config_set_bin(const std::string& section, const std::string& key,
   }
 
   {
-    std::unique_lock<std::mutex> lock(config_lock);
+    std::unique_lock<std::recursive_mutex> lock(config_lock);
     config_set_string(config.get(), section, key, str);
   }
 
@@ -381,7 +385,7 @@ std::list<section_t>& btif_config_sections() { return config->sections; }
 bool btif_config_remove(const std::string& section, const std::string& key) {
   CHECK(config != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   return config_remove_key(config.get(), section, key);
 }
 
@@ -406,7 +410,7 @@ bool btif_config_clear(void) {
 
   alarm_cancel(config_timer);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
 
   config = config_new_empty();
 
@@ -427,7 +431,7 @@ static void btif_config_write(UNUSED_ATTR uint16_t event,
   CHECK(config != NULL);
   CHECK(config_timer != NULL);
 
-  std::unique_lock<std::mutex> lock(config_lock);
+  std::unique_lock<std::recursive_mutex> lock(config_lock);
   rename(CONFIG_FILE_PATH, CONFIG_BACKUP_PATH);
   std::unique_ptr<config_t> config_paired = config_new_clone(*config);
   btif_config_remove_unpaired(config_paired.get());

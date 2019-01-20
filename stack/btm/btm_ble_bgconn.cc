@@ -351,6 +351,32 @@ void btm_send_hci_create_connection(
   }
 }
 
+bool BTM_SetLeConnectionModeToFast() {
+  VLOG(2) << __func__;
+  tBTM_BLE_CB* p_cb = &btm_cb.ble_ctr_cb;
+  if ((p_cb->scan_int == BTM_BLE_SCAN_PARAM_UNDEF &&
+       p_cb->scan_win == BTM_BLE_SCAN_PARAM_UNDEF) ||
+      (p_cb->scan_int == BTM_BLE_SCAN_SLOW_INT_1 &&
+       p_cb->scan_win == BTM_BLE_SCAN_SLOW_WIN_1)) {
+    p_cb->scan_int = BTM_BLE_SCAN_FAST_INT;
+    p_cb->scan_win = BTM_BLE_SCAN_FAST_WIN;
+    return true;
+  }
+  return false;
+}
+
+void BTM_SetLeConnectionModeToSlow() {
+  VLOG(2) << __func__;
+  tBTM_BLE_CB* p_cb = &btm_cb.ble_ctr_cb;
+  if ((p_cb->scan_int == BTM_BLE_SCAN_PARAM_UNDEF &&
+       p_cb->scan_win == BTM_BLE_SCAN_PARAM_UNDEF) ||
+      (p_cb->scan_int == BTM_BLE_SCAN_FAST_INT &&
+       p_cb->scan_win == BTM_BLE_SCAN_FAST_WIN)) {
+    p_cb->scan_int = BTM_BLE_SCAN_SLOW_INT_1;
+    p_cb->scan_win = BTM_BLE_SCAN_SLOW_WIN_1;
+  }
+}
+
 /** This function is to start auto connection procedure */
 bool btm_ble_start_auto_conn() {
   tBTM_BLE_CB* p_cb = &btm_cb.ble_ctr_cb;
@@ -442,11 +468,7 @@ bool btm_ble_stop_auto_conn() {
  ******************************************************************************/
 bool btm_ble_suspend_bg_conn(void) {
   BTM_TRACE_EVENT("%s", __func__);
-
-  if (btm_cb.ble_ctr_cb.bg_conn_type == BTM_BLE_CONN_AUTO)
-    return btm_ble_stop_auto_conn();
-
-  return false;
+  return btm_ble_stop_auto_conn();
 }
 
 /*******************************************************************************
@@ -461,14 +483,7 @@ bool btm_ble_suspend_bg_conn(void) {
  * Returns          none.
  *
  ******************************************************************************/
-bool btm_ble_resume_bg_conn(void) {
-  tBTM_BLE_CB* p_cb = &btm_cb.ble_ctr_cb;
-  if (p_cb->bg_conn_type == BTM_BLE_CONN_AUTO) {
-    return btm_ble_start_auto_conn();
-  }
-
-  return false;
-}
+bool btm_ble_resume_bg_conn(void) { return btm_ble_start_auto_conn(); }
 /*******************************************************************************
  *
  * Function         btm_ble_get_conn_st
@@ -497,80 +512,6 @@ void btm_ble_set_conn_st(tBTM_BLE_CONN_ST new_st) {
     btm_ble_set_topology_mask(BTM_BLE_STATE_INIT_BIT);
   else
     btm_ble_clear_topology_mask(BTM_BLE_STATE_INIT_BIT);
-}
-
-/*******************************************************************************
- *
- * Function         btm_ble_enqueue_direct_conn_req
- *
- * Description      This function enqueue the direct connection request
- *
- * Returns          None.
- *
- ******************************************************************************/
-void btm_ble_enqueue_direct_conn_req(void* p_param) {
-  tBTM_BLE_CONN_REQ* p =
-      (tBTM_BLE_CONN_REQ*)osi_malloc(sizeof(tBTM_BLE_CONN_REQ));
-
-  p->p_param = p_param;
-
-  fixed_queue_enqueue(btm_cb.ble_ctr_cb.conn_pending_q, p);
-}
-/*******************************************************************************
- *
- * Function         btm_ble_dequeue_direct_conn_req
- *
- * Description      This function dequeues the direct connection request
- *
- * Returns          None.
- *
- ******************************************************************************/
-void btm_ble_dequeue_direct_conn_req(const RawAddress& rem_bda) {
-  if (fixed_queue_is_empty(btm_cb.ble_ctr_cb.conn_pending_q)) return;
-
-  list_t* list = fixed_queue_get_list(btm_cb.ble_ctr_cb.conn_pending_q);
-  for (const list_node_t* node = list_begin(list); node != list_end(list);
-       node = list_next(node)) {
-    tBTM_BLE_CONN_REQ* p_req = (tBTM_BLE_CONN_REQ*)list_node(node);
-    tL2C_LCB* p_lcb = (tL2C_LCB*)p_req->p_param;
-    if ((p_lcb == NULL) || (!p_lcb->in_use)) {
-      continue;
-    }
-    // If BD address matches
-    if (rem_bda == p_lcb->remote_bd_addr) {
-      fixed_queue_try_remove_from_queue(btm_cb.ble_ctr_cb.conn_pending_q,
-                                        p_req);
-      l2cu_release_lcb((tL2C_LCB*)p_req->p_param);
-      osi_free((void*)p_req);
-      break;
-    }
-  }
-}
-
-/*******************************************************************************
- *
- * Function         btm_send_pending_direct_conn
- *
- * Description      This function send the pending direct connection request in
- *                  queue
- *
- * Returns          true if started, false otherwise
- *
- ******************************************************************************/
-bool btm_send_pending_direct_conn(void) {
-  tBTM_BLE_CONN_REQ* p_req;
-  bool rt = false;
-
-  p_req = (tBTM_BLE_CONN_REQ*)fixed_queue_try_dequeue(
-      btm_cb.ble_ctr_cb.conn_pending_q);
-  if (p_req != NULL) {
-    tL2C_LCB* p_lcb = (tL2C_LCB*)(p_req->p_param);
-    /* Ignore entries that might have been released while queued. */
-    if (p_lcb->in_use) rt = l2cble_init_direct_conn(p_lcb);
-    osi_free(p_req);
-  }
-
-  return rt;
 }
 
 /** Adds the device into white list. Returns false if white list is full and

@@ -279,7 +279,6 @@ void btif_gattc_open_impl(int client_if, RawAddress address, bool is_direct,
         return;
       }
     }
-    BTA_DmBleStartAutoConn();
   }
 
   // Determine transport

@@ -18,9 +18,6 @@
 
 #include "types/raw_address.h"
 
-/** Set BLE connectable mode to auto connect */
-extern void BTM_BleStartAutoConn();
-
 /** Adds the device into white list. Returns false if white list is full and
  * device can't be added, true otherwise. */
 extern bool BTM_WhiteListAdd(const RawAddress& address);
@@ -30,3 +27,14 @@ extern void BTM_WhiteListRemove(const RawAddress& address);
 
 /** Clear the whitelist, end any pending whitelist connections */
 extern void BTM_WhiteListClear();
+
+/* Use fast scan window/interval for LE connection establishment.
+ * This does not send any requests to controller, instead it changes the
+ * parameters that will be used after next add/remove request.
+ * Returns true, if the change is scheduled, false otherwise. */
+extern bool BTM_SetLeConnectionModeToFast();
+
+/* Use slow scan window/interval for LE connection establishment.
+ * This does not send any requests to controller, instead it changes the
+ * parameters that will be used after next add/remove request */
+extern void BTM_SetLeConnectionModeToSlow();

@@ -286,14 +286,12 @@ typedef struct {
   alarm_t* observer_timer;
 
   /* background connection procedure cb value */
-  tBTM_BLE_CONN_TYPE bg_conn_type;
   uint16_t scan_int;
   uint16_t scan_win;
 
   /* white list information */
   uint8_t wl_state;
 
-  fixed_queue_t* conn_pending_q;
   tBTM_BLE_CONN_ST conn_state;
 
   /* random address management control block */
