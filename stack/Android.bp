@@ -99,6 +99,7 @@ cc_library_static {
         "btm/btm_ble_adv_filter.cc",
         "btm/btm_ble_batchscan.cc",
         "btm/btm_ble_bgconn.cc",
+        "btm/btm_ble_connection_establishment.cc",
         "btm/btm_ble_cont_energy.cc",
         "btm/btm_ble_gap.cc",
         "btm/btm_ble_multi_adv.cc",
@@ -139,13 +140,6 @@ cc_library_static {
         "l2cap/l2c_main.cc",
         "l2cap/l2c_utils.cc",
         "l2cap/l2cap_client.cc",
-        "mcap/mca_api.cc",
-        "mcap/mca_cact.cc",
-        "mcap/mca_csm.cc",
-        "mcap/mca_dact.cc",
-        "mcap/mca_dsm.cc",
-        "mcap/mca_l2c.cc",
-        "mcap/mca_main.cc",
         "pan/pan_api.cc",
         "pan/pan_main.cc",
         "pan/pan_utils.cc",
@@ -196,6 +190,7 @@ cc_library_static {
 cc_test {
     name: "net_test_stack",
     defaults: ["fluoride_defaults"],
+    test_suites: ["device-tests"],
     local_include_dirs: [
         "include",
     ],
@@ -233,6 +228,7 @@ cc_test {
 cc_test {
     name: "net_test_stack_rfcomm",
     defaults: ["fluoride_defaults"],
+    test_suites: ["device-tests"],
     host_supported: true,
     local_include_dirs: [
         "include",
@@ -271,6 +267,7 @@ cc_test {
     shared_libs: [
         "libcutils",
         "libprotobuf-cpp-lite",
+        "libcrypto",
     ],
     static_libs: [
         "liblog",
@@ -289,6 +286,7 @@ cc_test {
 cc_test {
     name: "net_test_stack_smp",
     defaults: ["fluoride_defaults"],
+    test_suites: ["device-tests"],
     local_include_dirs: [
         "include",
         "btm",
@@ -328,6 +326,7 @@ cc_test {
 cc_test {
     name: "net_test_stack_multi_adv",
     defaults: ["fluoride_defaults"],
+    test_suites: ["device-tests"],
     local_include_dirs: [
         "include",
         "btm",
@@ -362,6 +361,7 @@ cc_test {
 cc_test {
     name: "net_test_stack_ad_parser",
     defaults: ["fluoride_defaults"],
+    test_suites: ["device-tests"],
     local_include_dirs: [
         "include",
     ],
