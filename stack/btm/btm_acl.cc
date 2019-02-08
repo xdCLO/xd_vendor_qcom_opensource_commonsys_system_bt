@@ -45,7 +45,6 @@
 #include "btm_api.h"
 #include "btm_int.h"
 #include "btu.h"
-#include "common/metrics.h"
 #include "device/include/controller.h"
 #include "device/include/interop.h"
 #include "hcidefs.h"
@@ -889,11 +888,6 @@ void btm_read_remote_version_complete(uint8_t* p) {
         if (p_acl_cb->transport == BT_TRANSPORT_BR_EDR) {
           btm_read_remote_features(p_acl_cb->hci_handle);
         }
-        bluetooth::common::LogRemoteVersionInfo(
-            handle, status, p_acl_cb->lmp_version, p_acl_cb->manufacturer,
-            p_acl_cb->lmp_subversion);
-      } else {
-        bluetooth::common::LogRemoteVersionInfo(handle, status, 0, 0, 0);
       }
 
       if (p_acl_cb->transport == BT_TRANSPORT_LE) {

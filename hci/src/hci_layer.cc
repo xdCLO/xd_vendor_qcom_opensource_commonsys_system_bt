@@ -25,7 +25,6 @@
 #include <base/run_loop.h>
 #include <base/sequenced_task_runner.h>
 #include <base/threading/thread.h>
-#include <frameworks/base/core/proto/android/bluetooth/hci/enums.pb.h>
 
 #include <signal.h>
 #include <string.h>
@@ -39,7 +38,6 @@
 #include "btsnoop.h"
 #include "buffer_allocator.h"
 #include "common/message_loop_thread.h"
-#include "common/metrics.h"
 #include "hci_inject.h"
 #include "hci_internals.h"
 #include "hcidefs.h"
@@ -483,7 +481,6 @@ static void command_timed_out_log_info(void* original_wait_entry) {
     }
 
     LOG_EVENT_INT(BT_HCI_TIMEOUT_TAG_NUM, wait_entry->opcode);
-    bluetooth::common::LogHciTimeoutEvent(wait_entry->opcode);
   }
 }
 
@@ -496,7 +493,6 @@ static void command_timed_out(void* original_wait_entry) {
           COMMAND_PENDING_MUTEX_ACQUIRE_TIMEOUT_MS))) {
     LOG_ERROR(LOG_TAG, "%s: Cannot obtain the mutex", __func__);
     LOG_EVENT_INT(BT_HCI_TIMEOUT_TAG_NUM, HCI_UNKNOWN_COMMAND_TIMED_OUT);
-    bluetooth::common::LogHciTimeoutEvent(android::bluetooth::hci::CMD_UNKNOWN);
   } else {
     command_timed_out_log_info(original_wait_entry);
     lock.unlock();
