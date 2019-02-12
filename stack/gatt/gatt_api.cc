@@ -382,6 +382,7 @@ void GATTS_StopService(uint16_t service_handle) {
   if (it == gatt_cb.srv_list_info->end()) {
     LOG(ERROR) << __func__ << ": service_handle=" << loghex(service_handle)
                << " is not in use";
+    return;
   }
 
   if (it->sdp_handle) {
@@ -739,7 +740,7 @@ tGATT_STATUS GATTC_Read(uint16_t conn_id, tGATT_READ_TYPE type,
   }
 
   /* start security check */
-  gatt_security_check_start(p_clcb);
+  if (gatt_security_check_start(p_clcb)) p_tcb->pending_enc_clcb.push(p_clcb);
   return GATT_SUCCESS;
 }
 
@@ -793,7 +794,7 @@ tGATT_STATUS GATTC_Write(uint16_t conn_id, tGATT_WRITE_TYPE type,
     p->offset = 0;
   }
 
-  gatt_security_check_start(p_clcb);
+  if (gatt_security_check_start(p_clcb)) p_tcb->pending_enc_clcb.push(p_clcb);
   return GATT_SUCCESS;
 }
 
@@ -1178,28 +1179,20 @@ bool GATT_CancelConnect(tGATT_IF gatt_if, const RawAddress& bd_addr,
 
   VLOG(1) << " unconditional";
 
-  if (is_direct) {
-    /* only LE connection can be cancelled */
-    tGATT_TCB* p_tcb = gatt_find_tcb_by_addr(bd_addr, BT_TRANSPORT_LE);
-    if (!p_tcb || p_tcb->app_hold_link.empty()) {
-      LOG(ERROR) << __func__ << " no app found";
-      return false;
-    }
-
+  /* only LE connection can be cancelled */
+  tGATT_TCB* p_tcb = gatt_find_tcb_by_addr(bd_addr, BT_TRANSPORT_LE);
+  if (p_tcb && !p_tcb->app_hold_link.empty()) {
     for (auto it = p_tcb->app_hold_link.begin();
          it != p_tcb->app_hold_link.end();) {
       auto next = std::next(it);
       // gatt_cancel_open modifies the app_hold_link.
-      if (!gatt_cancel_open(*it, bd_addr)) return false;
+      gatt_cancel_open(*it, bd_addr);
 
       it = next;
     }
-
-    return true;
   }
 
-  // is not direct
-  if (!connection_manager::background_connect_remove_unconditional(bd_addr)) {
+  if (!connection_manager::remove_unconditional(bd_addr)) {
     LOG(ERROR)
         << __func__
         << ": no app associated with the bg device for unconditional removal";
