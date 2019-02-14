@@ -276,6 +276,13 @@ class BluetoothMetricsLogger {
   std::unique_ptr<impl> const pimpl_;
 };
 
+/**
+ * no-op placeholder
+ */
+void LogSdpAttribute(const RawAddress& address, uint16_t protocol_uuid,
+                     uint16_t attribute_id, size_t attribute_size,
+                     const char* attribute_value);
+
 }  // namespace common
 
 }  // namespace bluetooth
