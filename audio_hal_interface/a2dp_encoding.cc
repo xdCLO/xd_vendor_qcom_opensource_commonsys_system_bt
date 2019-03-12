@@ -58,8 +58,8 @@ BluetoothAudioCtrlAck a2dp_ack_to_bt_audio_ctrl_ack(tA2DP_CTRL_ACK ack);
 // Provide call-in APIs for the Bluetooth Audio HAL
 class A2dpTransport : public ::bluetooth::audio::IBluetoothTransportInstance {
  public:
-  A2dpTransport(SessionType sessionType, AudioConfiguration audioConfig)
-      : IBluetoothTransportInstance(sessionType, std::move(audioConfig)),
+  A2dpTransport(SessionType sessionType)
+      : IBluetoothTransportInstance(sessionType, {}),
         a2dp_pending_cmd_(A2DP_CTRL_CMD_NONE),
         remote_delay_report_(0),
         total_bytes_read_(0),
@@ -552,8 +552,7 @@ namespace a2dp {
 // Checking if new bluetooth_audio is supported
 bool is_hal_2_0_supported() {
   if (!is_configured) {
-    btaudio_a2dp_supported =
-        osi_property_get_bool(BLUETOOTH_AUDIO_PROP_ENABLED, false);
+    btaudio_a2dp_supported = !osi_property_get_bool(BLUETOOTH_AUDIO_HAL_PROP_DISABLED, false);
     is_configured = true;
   }
   return btaudio_a2dp_supported;
@@ -571,25 +570,12 @@ bool init(bluetooth::common::MessageLoopThread* message_loop) {
     return false;
   }
 
-  AudioConfiguration audio_config{};
   if (btif_av_is_a2dp_offload_enabled()) {
-    CodecConfiguration codec_config{};
-    if (!a2dp_get_selected_hal_codec_config(&codec_config)) {
-      LOG(ERROR) << __func__ << ": Failed to get CodecConfiguration";
-      return false;
-    }
-    audio_config.codecConfig(codec_config);
     session_type = SessionType::A2DP_HARDWARE_OFFLOAD_DATAPATH;
   } else {
-    PcmParameters pcm_config{};
-    if (!a2dp_get_selected_hal_pcm_config(&pcm_config)) {
-      LOG(ERROR) << __func__ << ": Failed to get PcmConfiguration";
-      return false;
-    }
-    audio_config.pcmConfig(pcm_config);
     session_type = SessionType::A2DP_SOFTWARE_ENCODING_DATAPATH;
   }
-  a2dp_sink = new A2dpTransport(session_type, audio_config);
+  a2dp_sink = new A2dpTransport(session_type);
   a2dp_hal_clientif = new bluetooth::audio::BluetoothAudioClientInterface(
       a2dp_sink, message_loop);
   if (remote_delay != 0) {
