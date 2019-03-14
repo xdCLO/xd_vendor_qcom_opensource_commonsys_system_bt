@@ -279,13 +279,6 @@ class BluetoothMetricsLogger {
 };
 
 /**
- * no-op placeholder
- */
-void LogSdpAttribute(const RawAddress& address, uint16_t protocol_uuid,
-                     uint16_t attribute_id, size_t attribute_size,
-                     const char* attribute_value);
-
-/**
  * Unknown connection handle for metrics purpose
  */
 static const uint32_t kUnknownConnectionHandle = 0xFFFF;

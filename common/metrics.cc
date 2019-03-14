@@ -568,13 +568,6 @@ void BluetoothMetricsLogger::Reset() {
   pimpl_->wake_event_queue_->Clear();
   pimpl_->scan_event_queue_->Clear();
 }
-void LogSdpAttribute(const RawAddress& address, uint16_t protocol_uuid,
-                     uint16_t attribute_id, size_t attribute_size,
-                     const char* attribute_value) {
-  // TODO (b/124229503) This is a no-op placeholder to reduce the number of
-  // reverts. This function is properly defined in
-  // 9d9df72cf3e2215af34c8be1e1c935b097853b85
-}
 
 void LogLinkLayerConnectionEvent(const RawAddress* address,
                                  uint32_t connection_handle,
