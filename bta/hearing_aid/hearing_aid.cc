@@ -218,6 +218,8 @@ class HearingAidImpl : public HearingAid {
  private:
   // Keep track of whether the Audio Service has resumed audio playback
   bool audio_running;
+  // For Testing: overwrite the MIN_CE_LEN during connection parameter updates
+  uint16_t overwrite_min_ce_len;
 
  public:
   virtual ~HearingAidImpl() = default;
@@ -225,6 +227,7 @@ class HearingAidImpl : public HearingAid {
   HearingAidImpl(bluetooth::hearing_aid::HearingAidCallbacks* callbacks,
                  Closure initCb)
       : audio_running(false),
+        overwrite_min_ce_len(0),
         gatt_if(0),
         seq_counter(0),
         current_volume(VOLUME_UNKNOWN),
@@ -241,6 +244,13 @@ class HearingAidImpl : public HearingAid {
     }
     VLOG(2) << __func__
             << ", default_data_interval_ms=" << default_data_interval_ms;
+
+    overwrite_min_ce_len = (uint16_t)osi_property_get_int32(
+        "persist.bluetooth.hearingaidmincelen", 0);
+    if (overwrite_min_ce_len) {
+      LOG(INFO) << __func__
+                << ": Overwrites MIN_CE_LEN=" << overwrite_min_ce_len;
+    }
 
     BTA_GATTC_AppRegister(
         hearingaid_gattc_callback,
@@ -278,6 +288,12 @@ class HearingAidImpl : public HearingAid {
         connection_interval = CONNECTION_INTERVAL_10MS_PARAM;
     }
 
+    if (overwrite_min_ce_len != 0) {
+      VLOG(2) << __func__ << ": min_ce_len=" << min_ce_len
+              << " is overwritten to " << overwrite_min_ce_len;
+      min_ce_len = overwrite_min_ce_len;
+    }
+
     L2CA_UpdateBleConnParams(address, connection_interval, connection_interval,
                              0x000A, 0x0064 /*1s*/, min_ce_len, min_ce_len);
     return connection_interval;
@@ -287,6 +303,12 @@ class HearingAidImpl : public HearingAid {
     DVLOG(2) << __func__ << " " << address;
     hearingDevices.Add(HearingDevice(address, true));
     BTA_GATTC_Open(gatt_if, address, true, GATT_TRANSPORT_LE, false);
+  }
+
+  void AddToWhiteList(const RawAddress& address) override {
+    VLOG(2) << __func__ << " address: " << address;
+    hearingDevices.Add(HearingDevice(address, true));
+    BTA_GATTC_Open(gatt_if, address, false, GATT_TRANSPORT_LE, false);
   }
 
   void AddFromStorage(const HearingDevice& dev_info, uint16_t is_white_listed) {
@@ -1551,9 +1573,9 @@ class HearingAidImpl : public HearingAid {
       // Send the data packet
       LOG(INFO) << __func__ << ": Send State Change. device=" << device->address
                 << ", status=" << loghex(payload[1]);
-      BtaGattQueue::WriteCharacteristic(device->conn_id,
-                                        device->audio_control_point_handle,
-                                        payload, GATT_WRITE, nullptr, nullptr);
+      BtaGattQueue::WriteCharacteristic(
+          device->conn_id, device->audio_control_point_handle, payload,
+          GATT_WRITE_NO_RSP, nullptr, nullptr);
     }
   }
 
