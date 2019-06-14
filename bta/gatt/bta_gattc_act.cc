@@ -478,7 +478,7 @@ void bta_gattc_conn(tBTA_GATTC_CLCB* p_clcb, tBTA_GATTC_DATA* p_data) {
       p_clcb->p_srcb->state != BTA_GATTC_SERV_IDLE) {
     if (p_clcb->p_srcb->state == BTA_GATTC_SERV_IDLE) {
       p_clcb->p_srcb->state = BTA_GATTC_SERV_LOAD;
-      if (bta_gattc_cache_load(p_clcb)) {
+      if (bta_gattc_cache_load(p_clcb->p_srcb)) {
         p_clcb->p_srcb->state = BTA_GATTC_SERV_IDLE;
         bta_gattc_reset_discover_st(p_clcb->p_srcb, GATT_SUCCESS);
       } else {
@@ -1127,6 +1127,10 @@ bool bta_gattc_process_srvc_chg_ind(uint16_t conn_id, tBTA_GATTC_RCB* p_clrcb,
   Uuid gattp_uuid = Uuid::From16Bit(UUID_SERVCLASS_GATT_SERVER);
   Uuid srvc_chg_uuid = Uuid::From16Bit(GATT_UUID_GATT_SRV_CHGD);
 
+  if (p_srcb->gatt_database.IsEmpty() && p_srcb->state == BTA_GATTC_SERV_IDLE) {
+    bta_gattc_cache_load(p_srcb);
+  }
+
   const gatt::Characteristic* p_char =
       bta_gattc_get_characteristic_srcb(p_srcb, p_notify->handle);
   if (!p_char) return false;
@@ -1240,20 +1244,6 @@ void bta_gattc_process_indicate(uint16_t conn_id, tGATTC_OPTYPE op,
   }
 
   tBTA_GATTC_CLCB* p_clcb = bta_gattc_find_clcb_by_conn_id(conn_id);
-  /* connection not open yet */
-  if (p_clcb == NULL) {
-    p_clcb = bta_gattc_clcb_alloc(gatt_if, remote_bda, transport);
-
-    if (p_clcb == NULL) {
-      LOG(ERROR) << __func__ << ": No resources";
-      return;
-    }
-
-    p_clcb->bta_conn_id = conn_id;
-    p_clcb->transport = transport;
-
-    bta_gattc_sm_execute(p_clcb, BTA_GATTC_INT_CONN_EVT, NULL);
-  }
 
   notify.handle = handle;
 
@@ -1264,6 +1254,21 @@ void bta_gattc_process_indicate(uint16_t conn_id, tGATTC_OPTYPE op,
 
   /* if app registered for the notification */
   if (bta_gattc_check_notif_registry(p_clrcb, p_srcb, &notify)) {
+    /* connection not open yet */
+    if (p_clcb == NULL) {
+      p_clcb = bta_gattc_clcb_alloc(gatt_if, remote_bda, transport);
+
+      if (p_clcb == NULL) {
+        LOG(ERROR) << "No resources";
+        return;
+      }
+
+      p_clcb->bta_conn_id = conn_id;
+      p_clcb->transport = transport;
+
+      bta_gattc_sm_execute(p_clcb, BTA_GATTC_INT_CONN_EVT, NULL);
+    }
+
     if (p_clcb != NULL)
       bta_gattc_proc_other_indication(p_clcb, op, p_data, &notify);
   }
