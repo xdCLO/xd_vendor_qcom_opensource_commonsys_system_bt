@@ -16,10 +16,12 @@
 
 #pragma once
 
+#include <chrono>
 #include <map>
 
 #include "common/address.h"
 #include "common/bidi_queue.h"
+#include "common/callback.h"
 #include "common/class_of_device.h"
 #include "hal/hci_hal.h"
 #include "hci/hci_packets.h"
@@ -36,15 +38,22 @@ class HciLayer : public Module {
   DISALLOW_COPY_AND_ASSIGN(HciLayer);
 
   virtual void EnqueueCommand(std::unique_ptr<CommandPacketBuilder> command,
-                              std::function<void(CommandStatusView)> on_status,
-                              std::function<void(CommandCompleteView)> on_complete, os::Handler* handler);
+                              common::OnceCallback<void(CommandCompleteView)> on_complete, os::Handler* handler);
+
+  virtual void EnqueueCommand(std::unique_ptr<CommandPacketBuilder> command,
+                              common::OnceCallback<void(CommandStatusView)> on_status, os::Handler* handler);
 
   virtual common::BidiQueueEnd<AclPacketBuilder, AclPacketView>* GetAclQueueEnd();
 
-  virtual void RegisterEventHandler(EventCode event_code, std::function<void(EventPacketView)> event_handler,
+  virtual void RegisterEventHandler(EventCode event_code, common::Callback<void(EventPacketView)> event_handler,
                                     os::Handler* handler);
 
   virtual void UnregisterEventHandler(EventCode event_code);
+
+  virtual void RegisterLeEventHandler(SubeventCode subevent_code, common::Callback<void(LeMetaEventView)> event_handler,
+                                      os::Handler* handler);
+
+  virtual void UnregisterLeEventHandler(SubeventCode subevent_code);
 
   static const ModuleFactory Factory;
 
@@ -53,6 +62,7 @@ class HciLayer : public Module {
   void Start() override;
 
   void Stop() override;
+  static constexpr std::chrono::milliseconds kHciTimeoutMs = std::chrono::milliseconds(2000);
 
  private:
   struct impl;

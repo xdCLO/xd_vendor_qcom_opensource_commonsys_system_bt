@@ -191,6 +191,7 @@ enum OpCode : 16 {
 
   READ_SECURE_CONNECTIONS_HOST_SUPPORT = 0x0C79,
   WRITE_SECURE_CONNECTIONS_HOST_SUPPORT = 0x0C7A,
+  READ_LOCAL_OOB_EXTENDED_DATA = 0x0C7D,
 
   // INFORMATIONAL_PARAMETERS
   READ_LOCAL_VERSION_INFORMATION = 0x1001,
@@ -382,6 +383,7 @@ enum EventCode : 8 {
   REMOTE_HOST_SUPPORTED_FEATURES_NOTIFICATION = 0x3D,
   LE_META_EVENT = 0x3e,
   NUMBER_OF_COMPLETED_DATA_BLOCKS = 0x48,
+  VENDOR_SPECIFIC = 0xFF,
 }
 
 packet EventPacket {
@@ -471,6 +473,10 @@ packet CommandStatus : EventPacket (event_code = COMMAND_STATUS){
   num_hci_command_packets : 8,
   command_op_code : OpCode,
   _payload_,
+}
+
+  // Credits
+packet NoCommandComplete : CommandComplete (command_op_code = NONE){
 }
 
   // LINK_CONTROL
@@ -592,8 +598,7 @@ packet RejectConnectionRequestStatus : CommandStatus (command_op_code = REJECT_C
 
 packet LinkKeyRequestReply : SecurityCommand (op_code = LINK_KEY_REQUEST_REPLY) {
   bd_addr : Address,
-  link_key_lo : 64,
-  link_key_hi : 64,
+  link_key : 8[16],
 }
 
 packet LinkKeyRequestReplyComplete : CommandComplete (command_op_code = LINK_KEY_REQUEST_REPLY) {
@@ -613,21 +618,7 @@ packet PinCodeRequestReply : SecurityCommand (op_code = PIN_CODE_REQUEST_REPLY) 
   bd_addr : Address,
   pin_code_length : 5, // 0x01 - 0x10
   _reserved_ : 3,
-  pin_code_1 : 8, // string parameter, first octet first
-  pin_code_2 : 8,
-  pin_code_3 : 8,
-  pin_code_4 : 8,
-  pin_code_5 : 8,
-  pin_code_6 : 8,
-  pin_code_7 : 8,
-  pin_code_8 : 8,
-  pin_code_9 : 8,
-  pin_code_10 : 8,
-  pin_code_11 : 8,
-  pin_code_12 : 8,
-  pin_code_13 : 8,
-  pin_code_14 : 8,
-  pin_code_15 : 8,
+  pin_code : 8[16], // string parameter, first octet first
 }
 
 packet PinCodeRequestReplyComplete : CommandComplete (command_op_code = PIN_CODE_REQUEST_REPLY) {
@@ -841,7 +832,9 @@ packet UserPasskeyRequestNegativeReplyComplete : CommandComplete (command_op_cod
 }
 
 packet RemoteOobDataRequestReply : SecurityCommand (op_code = REMOTE_OOB_DATA_REQUEST_REPLY) {
-  _payload_,  // placeholder (unimplemented)
+  bd_addr : Address,
+  c : 8[16],
+  r : 8[16],
 }
 
 packet RemoteOobDataRequestReplyComplete : CommandComplete (command_op_code = REMOTE_OOB_DATA_REQUEST_REPLY) {
@@ -943,8 +936,71 @@ packet ResetComplete : CommandComplete (command_op_code = RESET) {
   status : ErrorCode,
 }
 
+enum FilterType : 8 {
+  CLEAR_ALL_FILTERS = 0x00,
+  INQUIRY_RESULT = 0x01,
+  CONNECTION_SETUP = 0x02,
+}
+
 packet SetEventFilter : CommandPacket (op_code = SET_EVENT_FILTER) {
-  _payload_,  // placeholder (unimplemented)
+  filter_type : FilterType,
+  _body_,
+}
+
+packet SetEventFilterComplete : CommandComplete (command_op_code = SET_EVENT_FILTER) {
+  status : ErrorCode,
+}
+
+packet SetEventFilterClearAll : SetEventFilter (filter_type = CLEAR_ALL_FILTERS) {
+}
+
+enum FilterConditionType : 8 {
+  ALL_DEVICES = 0x00,
+  CLASS_OF_DEVICE = 0x01,
+  ADDRESS = 0x02,
+}
+
+packet SetEventFilterInquiryResult : SetEventFilter (filter_type = INQUIRY_RESULT) {
+  filter_condition_type : FilterConditionType,
+  _body_,
+}
+
+packet SetEventFilterInquiryResultAllDevices : SetEventFilterInquiryResult (filter_condition_type = ALL_DEVICES) {
+}
+
+packet SetEventFilterInquiryResultClassOfDevice : SetEventFilterInquiryResult (filter_condition_type = CLASS_OF_DEVICE) {
+  class_of_device : ClassOfDevice,
+  class_of_device_mask : ClassOfDevice,
+}
+
+packet SetEventFilterInquiryResultAddress : SetEventFilterInquiryResult (filter_condition_type = ADDRESS) {
+  address : Address,
+}
+
+packet SetEventFilterConnectionSetup : SetEventFilter (filter_type = CONNECTION_SETUP) {
+  filter_condition_type : FilterConditionType,
+  _body_,
+}
+
+enum AutoAcceptFlag : 8 {
+  AUTO_ACCEPT_OFF = 0x01,
+  AUTO_ACCEPT_ON_ROLE_SWITCH_DISABLED = 0x02,
+  AUTO_ACCEPT_ON_ROLE_SWITCH_ENABLED = 0x03,
+}
+
+packet SetEventFilterConnectionSetupAllDevices : SetEventFilterConnectionSetup (filter_condition_type = ALL_DEVICES) {
+  auto_accept_flag : AutoAcceptFlag,
+}
+
+packet SetEventFilterConnectionSetupClassOfDevice : SetEventFilterConnectionSetup (filter_condition_type = CLASS_OF_DEVICE) {
+  class_of_device : ClassOfDevice,
+  class_of_device_mask : ClassOfDevice,
+  auto_accept_flag : AutoAcceptFlag,
+}
+
+packet SetEventFilterConnectionSetupAddress : SetEventFilterConnectionSetup (filter_condition_type = ADDRESS) {
+  address : Address,
+  auto_accept_flag : AutoAcceptFlag,
 }
 
 packet Flush : ConnectionManagementCommand (op_code = FLUSH) {
@@ -980,7 +1036,9 @@ packet ReadStoredLinkKeyComplete : CommandComplete (command_op_code = READ_STORE
 }
 
 packet WriteStoredLinkKey : SecurityCommand (op_code = WRITE_STORED_LINK_KEY) {
-  _payload_,
+  num_keys_to_write : 8,
+  bd_addr : Address,
+  link_key : 8[16],
 }
 
 packet WriteStoredLinkKeyComplete : CommandComplete (command_op_code = WRITE_STORED_LINK_KEY) {
@@ -1430,14 +1488,77 @@ packet WriteSecureConnectionsHostSupportComplete : CommandComplete (command_op_c
   status : ErrorCode,
 }
 
+packet ReadLocalOobExtendedData : SecurityCommand (op_code = READ_LOCAL_OOB_EXTENDED_DATA) {
+}
+
+packet ReadLocalOobExtendedDataComplete : CommandComplete (command_op_code = READ_LOCAL_OOB_EXTENDED_DATA) {
+  status : ErrorCode,
+  c_192_lo : 64,
+  c_192_hi : 64,
+  r_192_lo : 64,
+  r_192_hi : 64,
+  c_256_lo : 64,
+  c_256_hi : 64,
+  r_256_lo : 64,
+  r_256_hi : 64,
+}
+
+
   // INFORMATIONAL_PARAMETERS
 packet ReadLocalVersionInformation : CommandPacket (op_code = READ_LOCAL_VERSION_INFORMATION) {
+}
+
+enum HciVersion : 8 {
+  V_1_0b = 0x00,
+  V_1_1 = 0x01,
+  V_1_2 = 0x02,
+  V_2_0 = 0x03, //  + EDR
+  V_2_1 = 0x04, //  + EDR
+  V_3_0 = 0x05, //  + HS
+  V_4_0 = 0x06,
+  V_4_1 = 0x07,
+  V_4_2 = 0x08,
+  V_5_0 = 0x09,
+  V_5_1 = 0x0a,
+}
+
+enum LmpVersion : 8 {
+  V_1_0b = 0x00, // withdrawn
+  V_1_1 = 0x01, // withdrawn
+  V_1_2 = 0x02, // withdrawn
+  V_2_0 = 0x03, //  + EDR
+  V_2_1 = 0x04, //  + EDR
+  V_3_0 = 0x05, //  + HS
+  V_4_0 = 0x06,
+  V_4_1 = 0x07,
+  V_4_2 = 0x08,
+  V_5_0 = 0x09,
+  V_5_1 = 0x0a,
+}
+
+packet ReadLocalVersionInformationComplete : CommandComplete (command_op_code = READ_LOCAL_VERSION_INFORMATION) {
+  status : ErrorCode,
+  hci_version : HciVersion,
+  hci_revision : 16,
+  lmp_version : LmpVersion,
+  manufacturer_name : 16,
+  lmp_subversion : 16,
 }
 
 packet ReadLocalSupportedCommands : CommandPacket (op_code = READ_LOCAL_SUPPORTED_COMMANDS) {
 }
 
+packet ReadLocalSupportedCommandsComplete : CommandComplete (command_op_code = READ_LOCAL_SUPPORTED_COMMANDS) {
+  status : ErrorCode,
+  supported_commands : 8[64],
+}
+
 packet ReadLocalSupportedFeatures : CommandPacket (op_code = READ_LOCAL_SUPPORTED_FEATURES) {
+}
+
+packet ReadLocalSupportedFeaturesComplete : CommandComplete (command_op_code = READ_LOCAL_SUPPORTED_FEATURES) {
+  status : ErrorCode,
+  lmp_features : 64,
 }
 
 packet ReadLocalExtendedFeatures : CommandPacket (op_code = READ_LOCAL_EXTENDED_FEATURES) {
@@ -1447,7 +1568,20 @@ packet ReadLocalExtendedFeatures : CommandPacket (op_code = READ_LOCAL_EXTENDED_
 packet ReadBufferSize : CommandPacket (op_code = READ_BUFFER_SIZE) {
 }
 
+packet ReadBufferSizeComplete : CommandComplete (command_op_code = READ_BUFFER_SIZE) {
+  status : ErrorCode,
+  acl_data_packet_length : 16,
+  synchronous_data_packet_length : 8,
+  total_num_acl_data_packets : 16,
+  total_num_synchronous_data_packets : 16,
+}
+
 packet ReadBdAddr : CommandPacket (op_code = READ_BD_ADDR) {
+}
+
+packet ReadBdAddrComplete : CommandComplete (command_op_code = READ_BD_ADDR) {
+  status : ErrorCode,
+  bd_addr : Address,
 }
 
 packet ReadDataBlockSize : CommandPacket (op_code = READ_DATA_BLOCK_SIZE) {
@@ -2200,7 +2334,8 @@ packet RoleChange : EventPacket (event_code = ROLE_CHANGE){
 }
 
 packet NumberOfCompletedPackets : EventPacket (event_code = NUMBER_OF_COMPLETED_PACKETS){
-  _payload_,
+  _count_(handles_and_completed_packets) : 8,
+  handles_and_completed_packets : 32[], // connection_handle[i] : 12, _reserved_[i] : 4, hc_num_of_completed_packets[i] : 16
 }
 
 enum Mode : 8 {

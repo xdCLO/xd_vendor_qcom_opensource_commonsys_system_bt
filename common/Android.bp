@@ -38,7 +38,7 @@ cc_test {
         "system/bt",
         "system/bt/stack/include",
     ],
-    srcs : [
+    srcs: [
         "address_obfuscator_unittest.cc",
         "leaky_bonded_queue_unittest.cc",
         "message_loop_thread_unittest.cc",
@@ -53,7 +53,7 @@ cc_test {
         "libprotobuf-cpp-lite",
         "libcrypto",
     ],
-    static_libs : [
+    static_libs: [
         "libgmock",
         "libbt-common",
         "libbt-protos-lite",
@@ -78,7 +78,7 @@ cc_test {
     static_libs: [
         "libgmock",
         "libosi",
-        "libbt-common"
+        "libbt-common",
     ],
 }
 
@@ -98,7 +98,7 @@ cc_benchmark {
     ],
     static_libs: [
         "libosi",
-        "libbt-common"
+        "libbt-common",
     ],
 }
 
