@@ -18,9 +18,9 @@
 
 #include <memory>
 
-#include "common/address.h"
 #include "common/bidi_queue.h"
 #include "common/callback.h"
+#include "hci/address.h"
 #include "hci/hci_layer.h"
 #include "hci/hci_packets.h"
 #include "module.h"
@@ -33,10 +33,10 @@ class AclManager;
 
 class AclConnection {
  public:
-  AclConnection() : manager_(nullptr), handle_(0), address_(common::Address::kEmpty){};
+  AclConnection() : manager_(nullptr), handle_(0), address_(Address::kEmpty){};
   virtual ~AclConnection() = default;
 
-  virtual common::Address GetAddress() const {
+  virtual Address GetAddress() const {
     return address_;
   }
 
@@ -47,7 +47,7 @@ class AclConnection {
   using Queue = common::BidiQueue<PacketView<kLittleEndian>, BasePacketBuilder>;
   using QueueUpEnd = common::BidiQueueEnd<BasePacketBuilder, PacketView<kLittleEndian>>;
   using QueueDownEnd = common::BidiQueueEnd<PacketView<kLittleEndian>, BasePacketBuilder>;
-  QueueUpEnd* GetAclQueueEnd() const;
+  virtual QueueUpEnd* GetAclQueueEnd() const;
   virtual void RegisterDisconnectCallback(common::OnceCallback<void(ErrorCode)> on_disconnect, os::Handler* handler);
   virtual bool Disconnect(DisconnectReason reason);
   // Ask AclManager to clean me up. Must invoke after on_disconnect is called
@@ -57,11 +57,11 @@ class AclConnection {
 
  private:
   friend AclManager;
-  AclConnection(AclManager* manager, uint16_t handle, common::Address address)
+  AclConnection(AclManager* manager, uint16_t handle, Address address)
       : manager_(manager), handle_(handle), address_(address) {}
   AclManager* manager_;
   uint16_t handle_;
-  common::Address address_;
+  Address address_;
   DISALLOW_COPY_AND_ASSIGN(AclConnection);
 };
 
@@ -71,7 +71,16 @@ class ConnectionCallbacks {
   // Invoked when controller sends Connection Complete event with Success error code
   virtual void OnConnectSuccess(std::unique_ptr<AclConnection> /* , initiated_by_local ? */) = 0;
   // Invoked when controller sends Connection Complete event with non-Success error code
-  virtual void OnConnectFail(common::Address, ErrorCode reason) = 0;
+  virtual void OnConnectFail(Address, ErrorCode reason) = 0;
+};
+
+class LeConnectionCallbacks {
+ public:
+  virtual ~LeConnectionCallbacks() = default;
+  // Invoked when controller sends Connection Complete event with Success error code
+  virtual void OnLeConnectSuccess(std::unique_ptr<AclConnection> /* , initiated_by_local ? */) = 0;
+  // Invoked when controller sends Connection Complete event with non-Success error code
+  virtual void OnLeConnectFail(Address, AddressType, ErrorCode reason) = 0;
 };
 
 class AclManager : public Module {
@@ -83,16 +92,22 @@ class AclManager : public Module {
   // compiling AclManager's destructor until it starts linking the .cc file.
   ~AclManager() override;
 
-  // Returns true if callbacks are successfully registered. Should register only once when user module starts.
+  // Should register only once when user module starts.
   // Generates OnConnectSuccess when an incoming connection is established.
-  virtual bool RegisterCallbacks(ConnectionCallbacks* callbacks, os::Handler* handler);
+  virtual void RegisterCallbacks(ConnectionCallbacks* callbacks, os::Handler* handler);
+
+  // Should register only once when user module starts.
+  virtual void RegisterLeCallbacks(LeConnectionCallbacks* callbacks, os::Handler* handler);
 
   // Generates OnConnectSuccess if connected, or OnConnectFail otherwise
-  virtual void CreateConnection(common::Address address);
+  virtual void CreateConnection(Address address);
+
+  // Generates OnLeConnectSuccess if connected, or OnLeConnectFail otherwise
+  virtual void CreateLeConnection(Address address, AddressType address_type);
 
   // Generates OnConnectFail with error code "terminated by local host 0x16" if cancelled, or OnConnectSuccess if not
   // successfully cancelled and already connected
-  virtual void CancelConnect(common::Address address);
+  virtual void CancelConnect(Address address);
 
   static const ModuleFactory Factory;
 

@@ -1,7 +1,7 @@
 little_endian_packets
 
-custom_field Address : 48 "common/"
-custom_field ClassOfDevice : 24 "common/"
+custom_field Address : 48 "hci/"
+custom_field ClassOfDevice : 24 "hci/"
 
 enum Enable : 8 {
   DISABLED = 0x00,
@@ -58,8 +58,8 @@ packet ScoPacket {
   handle : 12,
   packet_status_flag : PacketStatusFlag,
   _reserved_ : 2, // BroadcastFlag
-  _size_(_payload_) : 8,
-  _payload_,
+  _size_(data) : 8,
+  data : 8[],
 }
 
 // HCI Command Packets
@@ -309,6 +309,224 @@ enum OpCode : 16 {
   LE_EXTENDED_SCAN_PARAMS = 0xFD5A,
   CONTROLLER_DEBUG_INFO = 0xFD5B,
   CONTROLLER_A2DP_OPCODE = 0xFD5D,
+}
+
+// For mapping Local Supported Commands command
+// Value = Octet * 10 + bit
+enum OpCodeIndex : 16 {
+  INQUIRY = 0,
+  INQUIRY_CANCEL = 1,
+  PERIODIC_INQUIRY_MODE = 2,
+  EXIT_PERIODIC_INQUIRY_MODE = 3,
+  CREATE_CONNECTION = 4,
+  DISCONNECT = 5,
+  CREATE_CONNECTION_CANCEL = 7,
+  ACCEPT_CONNECTION_REQUEST = 10,
+  REJECT_CONNECTION_REQUEST = 11,
+  LINK_KEY_REQUEST_REPLY = 12,
+  LINK_KEY_REQUEST_NEGATIVE_REPLY = 13,
+  PIN_CODE_REQUEST_REPLY = 14,
+  PIN_CODE_REQUEST_NEGATIVE_REPLY = 15,
+  CHANGE_CONNECTION_PACKET_TYPE = 16,
+  AUTHENTICATION_REQUESTED = 17,
+  SET_CONNECTION_ENCRYPTION = 20,
+  CHANGE_CONNECTION_LINK_KEY = 21,
+  MASTER_LINK_KEY = 22,
+  REMOTE_NAME_REQUEST = 23,
+  REMOTE_NAME_REQUEST_CANCEL = 24,
+  READ_REMOTE_SUPPORTED_FEATURES = 25,
+  READ_REMOTE_EXTENDED_FEATURES = 26,
+  READ_REMOTE_VERSION_INFORMATION = 27,
+  READ_CLOCK_OFFSET = 30,
+  READ_LMP_HANDLE = 31,
+  HOLD_MODE = 41,
+  SNIFF_MODE = 42,
+  EXIT_SNIFF_MODE = 43,
+  QOS_SETUP = 46,
+  ROLE_DISCOVERY = 47,
+  SWITCH_ROLE = 50,
+  READ_LINK_POLICY_SETTINGS = 51,
+  WRITE_LINK_POLICY_SETTINGS = 52,
+  READ_DEFAULT_LINK_POLICY_SETTINGS = 53,
+  WRITE_DEFAULT_LINK_POLICY_SETTINGS = 54,
+  FLOW_SPECIFICATION = 55,
+  SET_EVENT_MASK = 56,
+  RESET = 57,
+  SET_EVENT_FILTER = 60,
+  FLUSH = 61,
+  READ_PIN_TYPE = 62,
+  WRITE_PIN_TYPE = 63,
+  READ_STORED_LINK_KEY = 65,
+  WRITE_STORED_LINK_KEY = 66,
+  DELETE_STORED_LINK_KEY = 67,
+  WRITE_LOCAL_NAME = 70,
+  READ_LOCAL_NAME = 71,
+  READ_CONNECTION_ACCEPT_TIMEOUT = 72,
+  WRITE_CONNECTION_ACCEPT_TIMEOUT = 73,
+  READ_PAGE_TIMEOUT = 74,
+  WRITE_PAGE_TIMEOUT = 75,
+  READ_SCAN_ENABLE = 76,
+  WRITE_SCAN_ENABLE = 77,
+  READ_PAGE_SCAN_ACTIVITY = 80,
+  WRITE_PAGE_SCAN_ACTIVITY = 81,
+  READ_INQUIRY_SCAN_ACTIVITY = 82,
+  WRITE_INQUIRY_SCAN_ACTIVITY = 83,
+  READ_AUTHENTICATION_ENABLE = 84,
+  WRITE_AUTHENTICATION_ENABLE = 85,
+  READ_CLASS_OF_DEVICE = 90,
+  WRITE_CLASS_OF_DEVICE = 91,
+  READ_VOICE_SETTING = 92,
+  WRITE_VOICE_SETTING = 93,
+  READ_AUTOMATIC_FLUSH_TIMEOUT = 94,
+  WRITE_AUTOMATIC_FLUSH_TIMEOUT = 95,
+  READ_NUM_BROADCAST_RETRANSMITS = 96,
+  WRITE_NUM_BROADCAST_RETRANSMITS = 97,
+  READ_HOLD_MODE_ACTIVITY = 100,
+  WRITE_HOLD_MODE_ACTIVITY = 101,
+  READ_TRANSMIT_POWER_LEVEL = 102,
+  READ_SYNCHRONOUS_FLOW_CONTROL_ENABLE = 103,
+  WRITE_SYNCHRONOUS_FLOW_CONTROL_ENABLE = 104,
+  SET_CONTROLLER_TO_HOST_FLOW_CONTROL = 105,
+  HOST_BUFFER_SIZE = 106,
+  HOST_NUM_COMPLETED_PACKETS = 107,
+  READ_LINK_SUPERVISION_TIMEOUT = 110,
+  WRITE_LINK_SUPERVISION_TIMEOUT = 111,
+  READ_NUMBER_OF_SUPPORTED_IAC = 112,
+  READ_CURRENT_IAC_LAP = 113,
+  WRITE_CURRENT_IAC_LAP = 114,
+  SET_AFH_HOST_CHANNEL_CLASSIFICATION = 121,
+  READ_INQUIRY_SCAN_TYPE = 124,
+  WRITE_INQUIRY_SCAN_TYPE = 125,
+  READ_INQUIRY_MODE = 126,
+  WRITE_INQUIRY_MODE = 127,
+  READ_PAGE_SCAN_TYPE = 130,
+  WRITE_PAGE_SCAN_TYPE = 131,
+  READ_AFH_CHANNEL_ASSESSMENT_MODE = 132,
+  WRITE_AFH_CHANNEL_ASSESSMENT_MODE = 133,
+  READ_LOCAL_VERSION_INFORMATION = 143,
+  READ_LOCAL_SUPPORTED_FEATURES = 145,
+  READ_LOCAL_EXTENDED_FEATURES = 146,
+  READ_BUFFER_SIZE = 147,
+  READ_BD_ADDR = 151,
+  READ_FAILED_CONTACT_COUNTER = 152,
+  RESET_FAILED_CONTACT_COUNTER = 153,
+  READ_LINK_QUALITY = 154,
+  READ_RSSI = 155,
+  READ_AFH_CHANNEL_MAP = 156,
+  READ_CLOCK = 157,
+  READ_LOOPBACK_MODE = 160,
+  WRITE_LOOPBACK_MODE = 161,
+  ENABLE_DEVICE_UNDER_TEST_MODE = 162,
+  SETUP_SYNCHRONOUS_CONNECTION = 163,
+  ACCEPT_SYNCHRONOUS_CONNECTION = 164,
+  REJECT_SYNCHRONOUS_CONNECTION = 165,
+  READ_EXTENDED_INQUIRY_RESPONSE = 170,
+  WRITE_EXTENDED_INQUIRY_RESPONSE = 171,
+  REFRESH_ENCRYPTION_KEY = 172,
+  SNIFF_SUBRATING = 174,
+  READ_SIMPLE_PAIRING_MODE = 175,
+  WRITE_SIMPLE_PAIRING_MODE = 176,
+  READ_LOCAL_OOB_DATA = 177,
+  READ_INQUIRY_RESPONSE_TRANSMIT_POWER_LEVEL = 180,
+  WRITE_INQUIRY_TRANSMIT_POWER_LEVEL = 181,
+  IO_CAPABILITY_REQUEST_REPLY = 187,
+  USER_CONFIRMATION_REQUEST_REPLY = 190,
+  USER_CONFIRMATION_REQUEST_NEGATIVE_REPLY = 191,
+  USER_PASSKEY_REQUEST_REPLY = 192,
+  USER_PASSKEY_REQUEST_NEGATIVE_REPLY = 193,
+  REMOTE_OOB_DATA_REQUEST_REPLY = 194,
+  WRITE_SIMPLE_PAIRING_DEBUG_MODE = 195,
+  REMOTE_OOB_DATA_REQUEST_NEGATIVE_REPLY = 197,
+  SEND_KEYPRESS_NOTIFICATION = 202,
+  IO_CAPABILITY_REQUEST_NEGATIVE_REPLY = 203,
+  READ_ENCRYPTION_KEY_SIZE = 204,
+  READ_DATA_BLOCK_SIZE = 232,
+  READ_LE_HOST_SUPPORT = 245,
+  WRITE_LE_HOST_SUPPORT = 246,
+  LE_SET_EVENT_MASK = 250,
+  LE_READ_BUFFER_SIZE = 251,
+  LE_READ_LOCAL_SUPPORTED_FEATURES = 252,
+  LE_SET_RANDOM_ADDRESS = 254,
+  LE_SET_ADVERTISING_PARAMETERS = 255,
+  LE_READ_ADVERTISING_CHANNEL_TX_POWER = 256,
+  LE_SET_ADVERTISING_DATA = 257,
+  LE_SET_SCAN_RESPONSE_DATA = 260,
+  LE_SET_ADVERTISING_ENABLE = 261,
+  LE_SET_SCAN_PARAMETERS = 262,
+  LE_SET_SCAN_ENABLE = 263,
+  LE_CREATE_CONNECTION = 264,
+  LE_CREATE_CONNECTION_CANCEL = 265,
+  LE_READ_WHITE_LIST_SIZE = 266,
+  LE_CLEAR_WHITE_LIST = 267,
+  LE_ADD_DEVICE_TO_WHITE_LIST = 270,
+  LE_REMOVE_DEVICE_FROM_WHITE_LIST = 271,
+  LE_CONNECTION_UPDATE = 272,
+  LE_SET_HOST_CHANNEL_CLASSIFICATION = 273,
+  LE_READ_CHANNEL_MAP = 274,
+  LE_READ_REMOTE_FEATURES = 275,
+  LE_ENCRYPT = 276,
+  LE_RAND = 277,
+  LE_START_ENCRYPTION = 280,
+  LE_LONG_TERM_KEY_REQUEST_REPLY = 281,
+  LE_LONG_TERM_KEY_REQUEST_NEGATIVE_REPLY = 282,
+  LE_READ_SUPPORTED_STATES = 283,
+  LE_RECEIVER_TEST = 284,
+  LE_TRANSMITTER_TEST = 285,
+  LE_TEST_END = 286,
+  ENHANCED_SETUP_SYNCHRONOUS_CONNECTION = 293,
+  ENHANCED_ACCEPT_SYNCHRONOUS_CONNECTION = 294,
+  READ_LOCAL_SUPPORTED_CODECS = 295,
+  READ_SECURE_CONNECTIONS_HOST_SUPPORT = 322,
+  WRITE_SECURE_CONNECTIONS_HOST_SUPPORT = 323,
+  READ_LOCAL_OOB_EXTENDED_DATA = 326,
+  WRITE_SECURE_CONNECTIONS_TEST_MODE = 327,
+  LE_REMOTE_CONNECTION_PARAMETER_REQUEST_REPLY = 334,
+  LE_REMOTE_CONNECTION_PARAMETER_REQUEST_NEGATIVE_REPLY = 335,
+  LE_SET_DATA_LENGTH = 336,
+  LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH = 337,
+  LE_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH = 340,
+  LE_READ_LOCAL_P_256_PUBLIC_KEY_COMMAND = 341,
+  LE_GENERATE_DHKEY_COMMAND = 342,
+  LE_ADD_DEVICE_TO_RESOLVING_LIST = 343,
+  LE_REMOVE_DEVICE_FROM_RESOLVING_LIST = 344,
+  LE_CLEAR_RESOLVING_LIST = 345,
+  LE_READ_RESOLVING_LIST_SIZE = 346,
+  LE_READ_PEER_RESOLVABLE_ADDRESS = 347,
+  LE_READ_LOCAL_RESOLVABLE_ADDRESS = 350,
+  LE_SET_ADDRESS_RESOLUTION_ENABLE = 351,
+  LE_SET_RESOLVABLE_PRIVATE_ADDRESS_TIMEOUT = 352,
+  LE_READ_MAXIMUM_DATA_LENGTH = 353,
+  LE_READ_PHY = 354,
+  LE_SET_DEFAULT_PHY = 355,
+  LE_SET_PHY = 356,
+  LE_ENHANCED_RECEIVER_TEST = 357,
+  LE_ENHANCED_TRANSMITTER_TEST = 360,
+  LE_SET_EXTENDED_ADVERTISING_RANDOM_ADDRESS = 361,
+  LE_SET_EXTENDED_ADVERTISING_PARAMETERS = 362,
+  LE_SET_EXTENDED_ADVERTISING_DATA = 363,
+  LE_SET_EXTENDED_ADVERTISING_SCAN_RESPONSE = 364,
+  LE_SET_EXTENDED_ADVERTISING_ENABLE = 365,
+  LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH = 366,
+  LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS = 367,
+  LE_REMOVE_ADVERTISING_SET = 370,
+  LE_CLEAR_ADVERTISING_SETS = 371,
+  LE_SET_PERIODIC_ADVERTISING_PARAM = 372,
+  LE_SET_PERIODIC_ADVERTISING_DATA = 373,
+  LE_SET_PERIODIC_ADVERTISING_ENABLE = 374,
+  LE_SET_EXTENDED_SCAN_PARAMETERS = 375,
+  LE_SET_EXTENDED_SCAN_ENABLE = 376,
+  LE_EXTENDED_CREATE_CONNECTION = 377,
+  LE_PERIODIC_ADVERTISING_CREATE_SYNC = 380,
+  LE_PERIODIC_ADVERTISING_CREATE_SYNC_CANCEL = 381,
+  LE_PERIODIC_ADVERTISING_TERMINATE_SYNC = 382,
+  LE_ADD_DEVICE_TO_PERIODIC_ADVERTISING_LIST = 383,
+  LE_REMOVE_DEVICE_FROM_PERIODIC_ADVERTISING_LIST = 384,
+  LE_CLEAR_PERIODIC_ADVERTISING_LIST = 385,
+  LE_READ_PERIODIC_ADVERTISING_LIST_SIZE = 386,
+  LE_READ_TRANSMIT_POWER = 387,
+  LE_READ_RF_PATH_COMPENSATION_POWER = 390,
+  LE_WRITE_RF_PATH_COMPENSATION_POWER = 391,
+  LE_SET_PRIVACY_MODE = 392,
 }
 
 packet CommandPacket {
@@ -1035,10 +1253,14 @@ packet ReadStoredLinkKeyComplete : CommandComplete (command_op_code = READ_STORE
   num_keys_read : 16,
 }
 
-packet WriteStoredLinkKey : SecurityCommand (op_code = WRITE_STORED_LINK_KEY) {
-  num_keys_to_write : 8,
-  bd_addr : Address,
+struct KeyAndAddress {
+  address : Address,
   link_key : 8[16],
+}
+
+packet WriteStoredLinkKey : SecurityCommand (op_code = WRITE_STORED_LINK_KEY) {
+  _count_(keys_to_write) : 8, // 0x01-0x0B
+  keys_to_write : KeyAndAddress[],
 }
 
 packet WriteStoredLinkKeyComplete : CommandComplete (command_op_code = WRITE_STORED_LINK_KEY) {
@@ -1062,7 +1284,7 @@ packet DeleteStoredLinkKeyComplete : CommandComplete (command_op_code = DELETE_S
 }
 
 packet WriteLocalName : CommandPacket (op_code = WRITE_LOCAL_NAME) {
-  _payload_,
+  local_name : 8[248], // Null-terminated UTF-8 encoded name
 }
 
 packet WriteLocalNameComplete : CommandComplete (command_op_code = WRITE_LOCAL_NAME) {
@@ -1074,7 +1296,7 @@ packet ReadLocalName : CommandPacket (op_code = READ_LOCAL_NAME) {
 
 packet ReadLocalNameComplete : CommandComplete (command_op_code = READ_LOCAL_NAME) {
   status : ErrorCode,
-  _payload_,
+  local_name : 8[248], // Null-terminated UTF-8 encoded name
 }
 
 packet ReadConnectionAcceptTimeout : ConnectionManagementCommand (op_code = READ_CONNECTION_ACCEPT_TIMEOUT) {
@@ -1238,8 +1460,15 @@ packet HostBufferSizeComplete : CommandComplete (command_op_code = HOST_BUFFER_S
   status : ErrorCode,
 }
 
+struct CompletedPackets {
+  connection_handle : 12,
+  _reserved_ : 4,
+  host_num_of_completed_packets : 16,
+}
+
 packet HostNumCompletedPackets : CommandPacket (op_code = HOST_NUM_COMPLETED_PACKETS) {
-  _payload_,
+  _count_(completed_packets) : 8,
+  completed_packets : CompletedPackets[],
 }
 
 packet HostNumCompletedPacketsError : CommandComplete (command_op_code = HOST_NUM_COMPLETED_PACKETS) {
@@ -1410,10 +1639,8 @@ packet ReadLocalOobData : SecurityCommand (op_code = READ_LOCAL_OOB_DATA) {
 
 packet ReadLocalOobDataComplete : CommandComplete (command_op_code = READ_LOCAL_OOB_DATA) {
   status : ErrorCode,
-  clo : 64,
-  chi : 64,
-  rlo : 64,
-  rhi : 64,
+  c : 8[16],
+  r : 8[16],
 }
 
 packet ReadInquiryResponseTransmitPowerLevel : DiscoveryCommand (op_code = READ_INQUIRY_RESPONSE_TRANSMIT_POWER_LEVEL) {
@@ -1493,14 +1720,10 @@ packet ReadLocalOobExtendedData : SecurityCommand (op_code = READ_LOCAL_OOB_EXTE
 
 packet ReadLocalOobExtendedDataComplete : CommandComplete (command_op_code = READ_LOCAL_OOB_EXTENDED_DATA) {
   status : ErrorCode,
-  c_192_lo : 64,
-  c_192_hi : 64,
-  r_192_lo : 64,
-  r_192_hi : 64,
-  c_256_lo : 64,
-  c_256_hi : 64,
-  r_256_lo : 64,
-  r_256_hi : 64,
+  c_192 : 8[16],
+  r_192 : 8[16],
+  c_256 : 8[16],
+  r_256 : 8[16],
 }
 
 
@@ -1536,13 +1759,17 @@ enum LmpVersion : 8 {
   V_5_1 = 0x0a,
 }
 
-packet ReadLocalVersionInformationComplete : CommandComplete (command_op_code = READ_LOCAL_VERSION_INFORMATION) {
-  status : ErrorCode,
+struct LocalVersionInformation {
   hci_version : HciVersion,
   hci_revision : 16,
   lmp_version : LmpVersion,
   manufacturer_name : 16,
   lmp_subversion : 16,
+}
+
+packet ReadLocalVersionInformationComplete : CommandComplete (command_op_code = READ_LOCAL_VERSION_INFORMATION) {
+  status : ErrorCode,
+  local_version_information : LocalVersionInformation,
 }
 
 packet ReadLocalSupportedCommands : CommandPacket (op_code = READ_LOCAL_SUPPORTED_COMMANDS) {
@@ -1563,6 +1790,13 @@ packet ReadLocalSupportedFeaturesComplete : CommandComplete (command_op_code = R
 
 packet ReadLocalExtendedFeatures : CommandPacket (op_code = READ_LOCAL_EXTENDED_FEATURES) {
   page_number : 8,
+}
+
+packet ReadLocalExtendedFeaturesComplete : CommandComplete (command_op_code = READ_LOCAL_EXTENDED_FEATURES) {
+  status : ErrorCode,
+  page_number : 8,
+  maximum_page_number : 8,
+  extended_lmp_features : 64,
 }
 
 packet ReadBufferSize : CommandPacket (op_code = READ_BUFFER_SIZE) {
@@ -1695,10 +1929,14 @@ packet LeSetEventMaskComplete : CommandComplete (command_op_code = LE_SET_EVENT_
 packet LeReadBufferSize : CommandPacket (op_code = LE_READ_BUFFER_SIZE) {
 }
 
+struct LeBufferSize {
+  le_data_packet_length : 16,
+  total_num_le_packets : 8,
+}
+
 packet LeReadBufferSizeComplete : CommandComplete (command_op_code = LE_READ_BUFFER_SIZE) {
   status : ErrorCode,
-  hc_le_data_packet_length : 16,
-  hc_total_num_le_packets : 8,
+  le_buffer_size : LeBufferSize,
 }
 
 packet LeReadLocalSupportedFeatures : CommandPacket (op_code = LE_READ_LOCAL_SUPPORTED_FEATURES) {
@@ -1931,15 +2169,23 @@ packet LeEncrypt : LeSecurityCommand (op_code = LE_ENCRYPT) {
 }
 
 packet LeRand : LeSecurityCommand (op_code = LE_RAND) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+packet LeRandComplete : CommandComplete (command_op_code = LE_RAND) {
+  status : ErrorCode,
+  random_number : 64,
 }
 
 packet LeStartEncryption : LeSecurityCommand (op_code = LE_START_ENCRYPTION) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle: 16,
+  rand: 8[8],
+  ediv: 16,
+  ltk: 8[16],
 }
 
 packet LeLongTermKeyRequestReply : LeSecurityCommand (op_code = LE_LONG_TERM_KEY_REQUEST_REPLY) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle: 16,
+  long_term_key: 8[16],
 }
 
 packet LeLongTermKeyRequestNegativeReply : LeSecurityCommand (op_code = LE_LONG_TERM_KEY_REQUEST_NEGATIVE_REPLY) {
@@ -1947,7 +2193,11 @@ packet LeLongTermKeyRequestNegativeReply : LeSecurityCommand (op_code = LE_LONG_
 }
 
 packet LeReadSupportedStates : CommandPacket (op_code = LE_READ_SUPPORTED_STATES) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+packet LeReadSupportedStatesComplete : CommandComplete (command_op_code = LE_READ_SUPPORTED_STATES) {
+  status : ErrorCode,
+  le_states : 64,
 }
 
 packet LeReceiverTest : CommandPacket (op_code = LE_RECEIVER_TEST) {
@@ -2024,7 +2274,19 @@ packet LeSetResolvablePrivateAddressTimeout : LeSecurityCommand (op_code = LE_SE
 }
 
 packet LeReadMaximumDataLength : CommandPacket (op_code = LE_READ_MAXIMUM_DATA_LENGTH) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+struct LeMaximumDataLength {
+  supported_max_tx_octets : 16,
+  supported_max_tx_time: 16,
+  supported_max_rx_octets : 16,
+  supported_max_rx_time: 16,
+}
+
+
+packet LeReadMaximumDataLengthComplete : CommandComplete (command_op_code = LE_READ_MAXIMUM_DATA_LENGTH) {
+  status : ErrorCode,
+  le_maximum_data_length : LeMaximumDataLength,
 }
 
 packet LeReadPhy : LeConnectionManagementCommand (op_code = LE_READ_PHY) {
@@ -2068,11 +2330,19 @@ packet LeSetExtendedAdvertisingEnable : LeAdvertisingCommand (op_code = LE_SET_E
 }
 
 packet LeReadMaximumAdvertisingDataLength : CommandPacket (op_code = LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+packet LeReadMaximumAdvertisingDataLengthComplete : CommandComplete (command_op_code = LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH) {
+  status : ErrorCode,
+  maximum_advertising_data_length : 16,
 }
 
 packet LeReadNumberOfSupportedAdvertisingSets : CommandPacket (op_code = LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+packet LeReadNumberOfSupportedAdvertisingSetsComplete : CommandComplete (command_op_code = LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS) {
+  status : ErrorCode,
+  number_supported_advertising_sets : 8,
 }
 
 packet LeRemoveAdvertisingSet : LeAdvertisingCommand (op_code = LE_REMOVE_ADVERTISING_SET) {
@@ -2154,7 +2424,56 @@ packet LeSetPrivacyMode : LeSecurityCommand (op_code = LE_SET_PRIVACY_MODE) {
 
   // VENDOR_SPECIFIC
 packet LeGetVendorCapabilities : VendorCommand (op_code = LE_GET_VENDOR_CAPABILITIES) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+struct VendorCapabilities {
+  is_supported : 8,
+  max_advt_instances: 8,
+  offloaded_resolution_of_private_address : 8,
+  total_scan_results_storage: 16,
+  max_irk_list_sz: 8,
+  filtering_support: 8,
+  max_filter: 8,
+  activity_energy_info_support: 8,
+  version_supported: 16,
+  total_num_of_advt_tracked: 16,
+  extended_scan_support: 8,
+  debug_logging_supported: 8,
+  le_address_generation_offloading_support: 8,
+  a2dp_source_offload_capability_mask: 32,
+  bluetooth_quality_report_support: 8
+}
+
+struct BaseVendorCapabilities {
+  max_advt_instances: 8,
+  offloaded_resolution_of_private_address : 8,
+  total_scan_results_storage: 16,
+  max_irk_list_sz: 8,
+  filtering_support: 8,
+  max_filter: 8,
+  activity_energy_info_support: 8,
+}
+
+packet LeGetVendorCapabilitiesComplete : CommandComplete (command_op_code = LE_GET_VENDOR_CAPABILITIES) {
+  status : ErrorCode,
+  base_vendor_capabilities : BaseVendorCapabilities,
+  _payload_,
+}
+packet LeGetVendorCapabilitiesComplete095 : LeGetVendorCapabilitiesComplete {
+  version_supported: 16,
+  total_num_of_advt_tracked: 16,
+  extended_scan_support: 8,
+  debug_logging_supported: 8,
+  _payload_,
+}
+packet LeGetVendorCapabilitiesComplete096 : LeGetVendorCapabilitiesComplete095 {
+  le_address_generation_offloading_support: 8,
+  _payload_,
+}
+
+packet LeGetVendorCapabilitiesComplete098 : LeGetVendorCapabilitiesComplete096 {
+  a2dp_source_offload_capability_mask: 32,
+  bluetooth_quality_report_support: 8
 }
 
 packet LeMultiAdvt : VendorCommand (op_code = LE_MULTI_ADVT) {
@@ -2248,7 +2567,7 @@ packet AuthenticationComplete : EventPacket (event_code = AUTHENTICATION_COMPLET
 packet RemoteNameRequestComplete : EventPacket (event_code = REMOTE_NAME_REQUEST_COMPLETE){
   status : ErrorCode,
   bd_addr : Address,
-  _payload_,
+  remote_name : 8[248], // UTF-8 encoded user-friendly descriptive name
 }
 
 enum EncryptionEnabled : 8 {
@@ -2334,8 +2653,8 @@ packet RoleChange : EventPacket (event_code = ROLE_CHANGE){
 }
 
 packet NumberOfCompletedPackets : EventPacket (event_code = NUMBER_OF_COMPLETED_PACKETS){
-  _count_(handles_and_completed_packets) : 8,
-  handles_and_completed_packets : 32[], // connection_handle[i] : 12, _reserved_[i] : 4, hc_num_of_completed_packets[i] : 16
+  _count_(completed_packets) : 8,
+  completed_packets : CompletedPackets[],
 }
 
 enum Mode : 8 {
@@ -2605,12 +2924,12 @@ packet LeDataLengthChange : LeMetaEvent (subevent_code = DATA_LENGTH_CHANGE) {
 
 packet ReadLocalP256PublicKeyComplete : LeMetaEvent (subevent_code = READ_LOCAL_P256_PUBLIC_KEY_COMPLETE) {
   status : ErrorCode,
-  _payload_,
+  local_p_256_public_key : 8[64],
 }
 
 packet GenerateDhKeyComplete : LeMetaEvent (subevent_code = GENERATE_DHKEY_COMPLETE) {
   status : ErrorCode,
-  _payload_,
+  dh_key : 8[32],
 }
 
 packet LeEnhancedConnectionComplete : LeMetaEvent (subevent_code = ENHANCED_CONNECTION_COMPLETE) {
@@ -2644,8 +2963,18 @@ enum DirectAddressType : 8 {
   RANDOM_DEVICE_ADDRESS = 0x01,
 }
 
+struct LeDirectedAdvertisingReport {
+  event_type : DirectAdvertisingEventType,
+  address_type : DirectAdvertisingAddressType,
+  address : Address,
+  direct_address_type : DirectAddressType,
+  direct_address : Address,
+  rssi : 8,
+}
+
 packet LeDirectedAdvertisingReport : LeMetaEvent (subevent_code = DIRECTED_ADVERTISING_REPORT) {
-  _payload_, // placeholder (unimplemented)
+  _count_(le_directed_advertising_reports) : 8,
+  le_directed_advertising_reports : LeDirectedAdvertisingReport[],
 }
 
 packet LePhyUpdateComplete : LeMetaEvent (subevent_code = PHY_UPDATE_COMPLETE) {

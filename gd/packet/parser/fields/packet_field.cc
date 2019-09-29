@@ -16,6 +16,8 @@
 
 #include "fields/packet_field.h"
 
+#include "util.h"
+
 PacketField::PacketField(std::string name, ParseLocation loc) : loc_(loc), name_(name) {}
 
 std::string PacketField::GetDebugName() const {
@@ -60,9 +62,14 @@ void PacketField::GenBounds(std::ostream& s, Size start_offset, Size end_offset,
     }
   } else {
     s << "size_t field_end = field_begin + (" << field_size << ") / 8;";
+    s << "if (field_end > end_index) { field_end = end_index; }";
   }
 }
 
 bool PacketField::GenBuilderMember(std::ostream& s) const {
   return GenBuilderParameter(s);
+}
+
+void PacketField::GenBuilderParameterFromView(std::ostream& s) const {
+  s << "view.Get" << util::UnderscoreToCamelCase(GetName()) << "()";
 }

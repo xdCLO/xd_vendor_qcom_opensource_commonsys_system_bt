@@ -49,10 +49,6 @@ cc_defaults {
             clang_cflags: [
                 "-fprofile-instr-generate",
                 "-fcoverage-mapping",
-
-                // New pass manager does not work with -fprofile-instr-generate yet.
-                // http://b/131132095
-                "-fno-experimental-new-pass-manager",
             ],
         },
     },
@@ -71,10 +67,6 @@ cc_defaults {
             ldflags: [
                 "-fprofile-instr-generate",
                 "-fcoverage-mapping",
-
-                // New pass manager does not work with -fprofile-instr-generate yet.
-                // http://b/131132095
-                "-fno-experimental-new-pass-manager",
             ],
         },
     },
@@ -104,9 +96,7 @@ cc_library {
             ],
             shared_libs: [
                 "android.hardware.bluetooth@1.0",
-                "libhwbinder",
                 "libhidlbase",
-                "libhidltransport",
                 "libutils",
             ],
         },
@@ -120,6 +110,7 @@ cc_library {
         ":BluetoothHciSources",
         ":BluetoothL2capSources",
         ":BluetoothPacketSources",
+        ":BluetoothShimSources",
         ":BluetoothSmpSources",
     ],
     generated_headers: [
@@ -139,6 +130,7 @@ cc_binary {
     srcs: [
         "facade/facade_main.cc",
         "facade/grpc_root_server.cc",
+        "facade/read_only_property_server.cc",
         "grpc/grpc_module.cc",
         ":BluetoothFacade_hci_hal",
         ":BluetoothFacade_hci_layer",
@@ -163,9 +155,7 @@ cc_binary {
         android: {
             shared_libs: [
                 "android.hardware.bluetooth@1.0",
-                "libhwbinder",
                 "libhidlbase",
-                "libhidltransport",
                 "libutils",
             ],
         },
@@ -184,6 +174,7 @@ cc_binary {
     srcs: [
         "cert/cert_main.cc",
         "cert/grpc_root_server.cc",
+        "cert/read_only_property_server.cc",
         "grpc/grpc_module.cc",
         ":BluetoothCertSource_hci_hal",
         ":BluetoothCertSource_hci_layer",
@@ -208,9 +199,7 @@ cc_binary {
         android: {
             shared_libs: [
                 "android.hardware.bluetooth@1.0",
-                "libhwbinder",
                 "libhidlbase",
-                "libhidltransport",
                 "libutils",
             ],
         },
@@ -245,9 +234,7 @@ cc_test {
             ],
             shared_libs: [
                 "android.hardware.bluetooth@1.0",
-                "libhwbinder",
                 "libhidlbase",
-                "libhidltransport",
                 "libutils",
             ],
         },

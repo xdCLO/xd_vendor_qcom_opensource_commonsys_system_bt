@@ -51,13 +51,6 @@ class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluet
 
   using EventStream = ::bluetooth::grpc::GrpcEventStream<AclData, AclPacketView>;
 
-  ::grpc::Status ReadLocalAddress(::grpc::ServerContext* context, const ::google::protobuf::Empty* request,
-                                  ::bluetooth::facade::BluetoothAddress* response) override {
-    auto address = controller_->GetControllerMacAddress().ToString();
-    response->set_address(address);
-    return ::grpc::Status::OK;
-  }
-
   ::grpc::Status SetPageScanMode(::grpc::ServerContext* context, const ::bluetooth::hci::PageScanMode* request,
                                  ::google::protobuf::Empty* response) override {
     ScanEnable scan_enable = request->enabled() ? ScanEnable::PAGE_SCAN_ONLY : ScanEnable::NO_SCANS;
@@ -75,8 +68,8 @@ class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluet
   ::grpc::Status Connect(::grpc::ServerContext* context, const facade::BluetoothAddress* remote,
                          ::google::protobuf::Empty* response) override {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(remote->address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(remote->address(), peer));
     acl_manager_->CreateConnection(peer);
     return ::grpc::Status::OK;
   }
@@ -84,8 +77,8 @@ class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluet
   ::grpc::Status Disconnect(::grpc::ServerContext* context, const facade::BluetoothAddress* request,
                             ::google::protobuf::Empty* response) override {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    common::Address::FromString(request->address(), peer);
+    Address peer;
+    Address::FromString(request->address(), peer);
     auto connection = acl_connections_.find(request->address());
     if (connection == acl_connections_.end()) {
       LOG_ERROR("Invalid address");
@@ -121,6 +114,52 @@ class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluet
                               ::grpc::ServerWriter<AclData>* writer) override {
     std::unique_lock<std::mutex> lock(mutex_);
     return acl_stream_.HandleRequest(context, request, writer);
+  }
+
+  ::grpc::Status TestInternalHciCommands(::grpc::ServerContext* context, const ::google::protobuf::Empty* request,
+                                         ::google::protobuf::Empty* response) {
+    LocalVersionInformation local_version_information = controller_->GetControllerLocalVersionInformation();
+    LOG_DEBUG("local name : %s", controller_->GetControllerLocalName().c_str());
+    controller_->WriteLocalName("Device Under Test");
+    LOG_DEBUG("new local name : %s", controller_->GetControllerLocalName().c_str());
+    LOG_DEBUG("manufacturer name : %d", local_version_information.manufacturer_name_);
+    LOG_DEBUG("hci version : %x", (uint16_t)local_version_information.hci_version_);
+    LOG_DEBUG("lmp version : %x", (uint16_t)local_version_information.lmp_version_);
+    LOG_DEBUG("supported commands : %x", controller_->GetControllerLocalSupportedCommands()[0]);
+    LOG_DEBUG("local extended features :");
+
+    controller_->SetEventMask(0x00001FFFFFFFFFFF);
+    controller_->SetEventFilterInquiryResultAllDevices();
+    ClassOfDevice class_of_device({0xab, 0xcd, 0xef});
+    ClassOfDevice class_of_device_mask({0x12, 0x34, 0x56});
+    controller_->SetEventFilterInquiryResultClassOfDevice(class_of_device, class_of_device_mask);
+    Address bdaddr({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
+    controller_->SetEventFilterInquiryResultAddress(bdaddr);
+    controller_->SetEventFilterConnectionSetupAllDevices(AutoAcceptFlag::AUTO_ACCEPT_OFF);
+    controller_->SetEventFilterConnectionSetupClassOfDevice(class_of_device, class_of_device_mask,
+                                                            AutoAcceptFlag::AUTO_ACCEPT_ON_ROLE_SWITCH_DISABLED);
+    controller_->SetEventFilterConnectionSetupAddress(bdaddr, AutoAcceptFlag::AUTO_ACCEPT_ON_ROLE_SWITCH_ENABLED);
+    controller_->SetEventFilterClearAll();
+    controller_->HostBufferSize(0xFF00, 0xF1, 0xFF02, 0xFF03);
+    return ::grpc::Status::OK;
+  }
+
+  ::grpc::Status TestInternalHciLeCommands(::grpc::ServerContext* context, const ::google::protobuf::Empty* request,
+                                           ::google::protobuf::Empty* response) {
+    LOG_DEBUG("le data packet length : %d", controller_->GetControllerLeBufferSize().le_data_packet_length_);
+    LOG_DEBUG("total num le packets : %d", controller_->GetControllerLeBufferSize().total_num_le_packets_);
+    LOG_DEBUG("le supported max tx octets : %d",
+              controller_->GetControllerLeMaximumDataLength().supported_max_tx_octets_);
+    LOG_DEBUG("le supported max tx times : %d", controller_->GetControllerLeMaximumDataLength().supported_max_tx_time_);
+    LOG_DEBUG("le supported max rx octets : %d",
+              controller_->GetControllerLeMaximumDataLength().supported_max_rx_octets_);
+    LOG_DEBUG("le supported max rx times : %d", controller_->GetControllerLeMaximumDataLength().supported_max_rx_time_);
+    LOG_DEBUG("le maximum advertising data length %d", controller_->GetControllerLeMaximumAdvertisingDataLength());
+    LOG_DEBUG("le number of supported advertising sets %d",
+              controller_->GetControllerLeNumberOfSupportedAdverisingSets());
+
+    controller_->LeSetEventMask(0x000000000000001F);
+    return ::grpc::Status::OK;
   }
 
   void on_incoming_acl(std::string address) {
@@ -163,7 +202,7 @@ class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluet
     return connection_complete_stream_.HandleRequest(context, request, writer);
   };
 
-  void OnConnectFail(::bluetooth::common::Address address, ::bluetooth::hci::ErrorCode reason) override {
+  void OnConnectFail(Address address, ::bluetooth::hci::ErrorCode reason) override {
     std::unique_lock<std::mutex> lock(mutex_);
     ConnectionFailedEvent event;
     event.mutable_remote()->set_address(address.ToString());
@@ -309,9 +348,9 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                      const ::bluetooth::hci::LinkKeyRequestReplyMessage* request,
                                      ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
+    Address peer;
     common::LinkKey link_key;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
+    ASSERT(Address::FromString(request->remote().address(), peer));
     ASSERT(common::LinkKey::FromString(request->link_key(), link_key));
     classic_security_manager_->LinkKeyRequestReply(peer, link_key);
     return ::grpc::Status::OK;
@@ -321,8 +360,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                              const ::bluetooth::facade::BluetoothAddress* request,
                                              ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->address(), peer));
     classic_security_manager_->LinkKeyRequestNegativeReply(peer);
     return ::grpc::Status::OK;
   }
@@ -331,8 +370,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                      const ::bluetooth::hci::PinCodeRequestReplyMessage* request,
                                      ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->remote().address(), peer));
     uint8_t len = request->len();
     std::string pin_code = request->pin_code();
     classic_security_manager_->PinCodeRequestReply(peer, len, pin_code);
@@ -343,8 +382,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                              const ::bluetooth::facade::BluetoothAddress* request,
                                              ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->address(), peer));
     classic_security_manager_->PinCodeRequestNegativeReply(peer);
     return ::grpc::Status::OK;
   }
@@ -353,8 +392,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                           const ::bluetooth::hci::IoCapabilityRequestReplyMessage* request,
                                           ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->remote().address(), peer));
     IoCapability io_capability = (IoCapability)request->io_capability();
     OobDataPresent oob_present = (OobDataPresent)request->oob_present();
     AuthenticationRequirements authentication_requirements =
@@ -367,8 +406,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
       ::grpc::ServerContext* context, const ::bluetooth::hci::IoCapabilityRequestNegativeReplyMessage* request,
       ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->remote().address(), peer));
     ErrorCode reason = (ErrorCode)request->reason();
     classic_security_manager_->IoCapabilityRequestNegativeReply(peer, reason);
     return ::grpc::Status::OK;
@@ -378,8 +417,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                               const ::bluetooth::facade::BluetoothAddress* request,
                                               ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->address(), peer));
     classic_security_manager_->UserConfirmationRequestReply(peer);
     return ::grpc::Status::OK;
   }
@@ -388,8 +427,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                                       const ::bluetooth::facade::BluetoothAddress* request,
                                                       ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->address(), peer));
     classic_security_manager_->UserConfirmationRequestNegativeReply(peer);
     return ::grpc::Status::OK;
   }
@@ -398,8 +437,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                          const ::bluetooth::hci::UserPasskeyRequestReplyMessage* request,
                                          ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->remote().address(), peer));
     uint32_t passkey = request->passkey();
     classic_security_manager_->UserPasskeyRequestReply(peer, passkey);
     return ::grpc::Status::OK;
@@ -409,8 +448,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                                  const ::bluetooth::facade::BluetoothAddress* request,
                                                  ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->address(), peer));
     classic_security_manager_->UserPasskeyRequestNegativeReply(peer);
     return ::grpc::Status::OK;
   }
@@ -419,8 +458,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                            const ::bluetooth::hci::RemoteOobDataRequestReplyMessage* request,
                                            ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->remote().address(), peer));
     std::string c_string = request->c();
     std::string r_string = request->r();
     std::array<uint8_t, 16> c;
@@ -435,8 +474,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                                    const ::bluetooth::facade::BluetoothAddress* request,
                                                    ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->address(), peer));
     classic_security_manager_->RemoteOobDataRequestNegativeReply(peer);
     return ::grpc::Status::OK;
   }
@@ -445,8 +484,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                    const ::bluetooth::hci::ReadStoredLinkKeyMessage* request,
                                    ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->remote().address(), peer));
     ReadStoredLinkKeyReadAllFlag read_all_flag = (ReadStoredLinkKeyReadAllFlag)request->read_all_flag();
     classic_security_manager_->ReadStoredLinkKey(peer, read_all_flag);
     return ::grpc::Status::OK;
@@ -457,12 +496,17 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                     ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
     uint8_t num_keys_to_write = request->num_keys_to_write();
-    common::Address peer;
-    common::LinkKey link_key;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
-    ASSERT(common::LinkKey::FromString(request->link_keys(), link_key));
+    std::vector<KeyAndAddress> keys;
+    for (size_t i = 0; i < num_keys_to_write; i++) {
+      KeyAndAddress key;
+      common::LinkKey link_key;
+      ASSERT(Address::FromString(request->remote().address(), key.address_));
+      ASSERT(common::LinkKey::FromString(request->link_keys(), link_key));
+      std::copy(std::begin(link_key.link_key), std::end(link_key.link_key), std::begin(key.link_key_));
+      keys.push_back(key);
+    }
 
-    classic_security_manager_->WriteStoredLinkKey(num_keys_to_write, peer, link_key);
+    classic_security_manager_->WriteStoredLinkKey(keys);
     return ::grpc::Status::OK;
   };
 
@@ -470,8 +514,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                      const ::bluetooth::hci::DeleteStoredLinkKeyMessage* request,
                                      ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->remote().address(), peer));
     DeleteStoredLinkKeyDeleteAllFlag delete_all_flag = (DeleteStoredLinkKeyDeleteAllFlag)request->delete_all_flag();
     classic_security_manager_->DeleteStoredLinkKey(peer, delete_all_flag);
     return ::grpc::Status::OK;
@@ -512,8 +556,8 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                           const ::bluetooth::hci::SendKeypressNotificationMessage* request,
                                           ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
-    common::Address peer;
-    ASSERT(common::Address::FromString(request->remote().address(), peer));
+    Address peer;
+    ASSERT(Address::FromString(request->remote().address(), peer));
     KeypressNotificationType notification_type = (KeypressNotificationType)request->notification_type();
     classic_security_manager_->SendKeypressNotification(peer, notification_type);
     return ::grpc::Status::OK;
