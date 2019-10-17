@@ -15,15 +15,33 @@
  */
 
 #include "l2cap/classic_fixed_channel.h"
+#include "common/bind.h"
+#include "l2cap/internal/classic_fixed_channel_impl.h"
 
 namespace bluetooth {
 namespace l2cap {
-void ClassicFixedChannel::RegisterOnCloseCallback(os::Handler* handler, OnCloseCallback callback) {}
-void ClassicFixedChannel::Acquire() {}
-void ClassicFixedChannel::Release() {}
-common::BidiQueueEnd<packet::PacketView<packet::kLittleEndian>, packet::BasePacketBuilder>*
+
+hci::Address ClassicFixedChannel::GetDevice() const {
+  return impl_->GetDevice();
+}
+
+void ClassicFixedChannel::RegisterOnCloseCallback(os::Handler* user_handler,
+                                                  ClassicFixedChannel::OnCloseCallback on_close_callback) {
+  l2cap_handler_->Post(common::BindOnce(&internal::ClassicFixedChannelImpl::RegisterOnCloseCallback, impl_,
+                                        user_handler, std::move(on_close_callback)));
+}
+
+void ClassicFixedChannel::Acquire() {
+  l2cap_handler_->Post(common::BindOnce(&internal::ClassicFixedChannelImpl::Acquire, impl_));
+}
+
+void ClassicFixedChannel::Release() {
+  l2cap_handler_->Post(common::BindOnce(&internal::ClassicFixedChannelImpl::Release, impl_));
+}
+
+common::BidiQueueEnd<packet::BasePacketBuilder, packet::PacketView<packet::kLittleEndian>>*
 ClassicFixedChannel::GetQueueUpEnd() const {
-  return nullptr;
+  return impl_->GetQueueUpEnd();
 }
 }  // namespace l2cap
 }  // namespace bluetooth

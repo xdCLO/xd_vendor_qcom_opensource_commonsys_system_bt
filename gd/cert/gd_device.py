@@ -67,6 +67,7 @@ class GdDevice(GdDeviceBase):
         # Facade stubs
         self.rootservice = facade_rootservice_pb2_grpc.RootFacadeStub(self.grpc_root_server_channel)
         self.hal = hal_facade_pb2_grpc.HciHalFacadeStub(self.grpc_channel)
+        self.controller_read_only_property = facade_rootservice_pb2_grpc.ReadOnlyPropertyStub(self.grpc_channel)
         self.hci = hci_facade_pb2_grpc.AclManagerFacadeStub(self.grpc_channel)
         self.hci_classic_security = hci_facade_pb2_grpc.ClassicSecurityManagerFacadeStub(self.grpc_channel)
         self.l2cap = l2cap_facade_pb2_grpc.L2capModuleFacadeStub(self.grpc_channel)
@@ -80,3 +81,5 @@ class GdDevice(GdDeviceBase):
         self.hci.connection_failed_stream = EventStream(self.hci.FetchConnectionFailed)
         self.hci.acl_stream = EventStream(self.hci.FetchAclData)
         self.hci_classic_security.command_complete_stream = EventStream(self.hci_classic_security.FetchCommandCompleteEvent)
+        self.l2cap.packet_stream = EventStream(self.l2cap.FetchL2capData)
+        self.l2cap.connection_complete_stream = EventStream(self.l2cap.FetchConnectionComplete)

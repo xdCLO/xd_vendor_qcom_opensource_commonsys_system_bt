@@ -57,9 +57,9 @@ class SimpleHciTest(GdBaseTestClass):
             hci_cert_pb2.PageScanMode(enabled=True)
         )
 
-        dut_address = self.device_under_test.hci.ReadLocalAddress(empty_pb2.Empty()).address
+        dut_address = self.device_under_test.controller_read_only_property.ReadLocalAddress(empty_pb2.Empty()).address
         self.device_under_test.address = dut_address
-        cert_address = self.cert_device.hci.ReadLocalAddress(empty_pb2.Empty()).address
+        cert_address = self.cert_device.controller_read_only_property.ReadLocalAddress(empty_pb2.Empty()).address
         self.cert_device.address = cert_address
 
         self.dut_connection_complete_stream = self.device_under_test.hci.connection_complete_stream
@@ -335,4 +335,10 @@ class SimpleHciTest(GdBaseTestClass):
         )
 
         self.dut_command_complete_stream.unsubscribe()
+        self._disconnect_from_dut()
+
+    def test_interal_hci_command(self):
+        self._connect_from_dut()
+        self.device_under_test.hci.TestInternalHciCommands(empty_pb2.Empty())
+        self.device_under_test.hci.TestInternalHciLeCommands(empty_pb2.Empty())
         self._disconnect_from_dut()

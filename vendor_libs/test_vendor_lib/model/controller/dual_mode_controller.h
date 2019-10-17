@@ -64,9 +64,6 @@ class DualModeController : public Device {
 
   virtual void TimerTick() override;
 
-  // Send packets to remote devices
-  void SendLinkLayerPacket(std::shared_ptr<packets::LinkLayerPacketBuilder> to_send, Phy::Type phy_type);
-
   // Route commands and data from the stack.
   void HandleAcl(std::shared_ptr<std::vector<uint8_t>> acl_packet);
   void HandleCommand(std::shared_ptr<std::vector<uint8_t>> command_packet);
@@ -306,6 +303,12 @@ class DualModeController : public Device {
 
   // 7.8.7
   void HciLeSetAdvertisingData(packets::PacketView<true> args);
+
+  // 7.8.8
+  void HciLeSetScanResponseData(packets::PacketView<true> args);
+
+  // 7.8.9
+  void HciLeSetAdvertisingEnable(packets::PacketView<true> args);
 
   // 7.8.10
   void HciLeSetScanParameters(packets::PacketView<true> args);
