@@ -41,12 +41,16 @@ using ::bluetooth::packet::RawBuilder;
 namespace bluetooth {
 namespace hci {
 
-class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluetooth::hci::ConnectionCallbacks {
+class AclManagerFacadeService : public AclManagerFacade::Service,
+                                public ::bluetooth::hci::ConnectionCallbacks,
+                                public ::bluetooth::hci::ConnectionManagementCallbacks,
+                                public ::bluetooth::hci::AclManagerCallbacks {
  public:
   AclManagerFacadeService(AclManager* acl_manager, Controller* controller, HciLayer* hci_layer,
                           ::bluetooth::os::Handler* facade_handler)
       : acl_manager_(acl_manager), controller_(controller), hci_layer_(hci_layer), facade_handler_(facade_handler) {
     acl_manager_->RegisterCallbacks(this, facade_handler_);
+    acl_manager_->RegisterAclManagerCallbacks(this, facade_handler_);
   }
 
   using EventStream = ::bluetooth::grpc::GrpcEventStream<AclData, AclPacketView>;
@@ -88,6 +92,20 @@ class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluet
       return ::grpc::Status::OK;
     }
   }
+
+  ::grpc::Status AuthenticationRequested(::grpc::ServerContext* context, const facade::BluetoothAddress* request,
+                                         ::google::protobuf::Empty* response) override {
+    Address peer;
+    Address::FromString(request->address(), peer);
+    auto connection = acl_connections_.find(request->address());
+    if (connection == acl_connections_.end()) {
+      LOG_ERROR("Invalid address");
+      return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, "Invalid address");
+    } else {
+      connection->second->AuthenticationRequested();
+      return ::grpc::Status::OK;
+    }
+  };
 
   ::grpc::Status SendAclData(::grpc::ServerContext* context, const AclData* request,
                              ::google::protobuf::Empty* response) override {
@@ -162,6 +180,55 @@ class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluet
     return ::grpc::Status::OK;
   }
 
+  ::grpc::Status TestClassicConnectionManagementCommands(::grpc::ServerContext* context,
+                                                         const facade::BluetoothAddress* request,
+                                                         ::google::protobuf::Empty* response) {
+    Address peer;
+    Address::FromString(request->address(), peer);
+    auto connection = acl_connections_.find(request->address());
+    if (connection == acl_connections_.end()) {
+      LOG_ERROR("Invalid address");
+      return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, "Invalid address");
+    } else {
+      // TODO add individual grpc command if necessary
+      connection->second->RoleDiscovery();
+      connection->second->WriteLinkPolicySettings(0x07);
+      connection->second->ReadLinkPolicySettings();
+      connection->second->SniffSubrating(0x1234, 0x1234, 0x1234);
+      connection->second->WriteAutomaticFlushTimeout(0x07FF);
+      connection->second->ReadAutomaticFlushTimeout();
+      connection->second->ReadTransmitPowerLevel(TransmitPowerLevelType::CURRENT);
+      connection->second->ReadTransmitPowerLevel(TransmitPowerLevelType::MAXIMUM);
+      connection->second->WriteLinkSupervisionTimeout(0x5678);
+      connection->second->ReadLinkSupervisionTimeout();
+      connection->second->ReadFailedContactCounter();
+      connection->second->ResetFailedContactCounter();
+      connection->second->ReadLinkQuality();
+      connection->second->ReadAfhChannelMap();
+      connection->second->ReadRssi();
+      connection->second->ReadClock(WhichClock::LOCAL);
+      connection->second->ReadClock(WhichClock::PICONET);
+
+      connection->second->ChangeConnectionPacketType(0xEE1C);
+      connection->second->SetConnectionEncryption(Enable::ENABLED);
+      connection->second->ChangeConnectionLinkKey();
+      connection->second->ReadClockOffset();
+      connection->second->HoldMode(0x0500, 0x0020);
+      connection->second->SniffMode(0x0500, 0x0020, 0x0040, 0x0014);
+      connection->second->ExitSniffMode();
+      connection->second->QosSetup(ServiceType::BEST_EFFORT, 0x1234, 0x1233, 0x1232, 0x1231);
+      connection->second->FlowSpecification(FlowDirection::OUTGOING_FLOW, ServiceType::BEST_EFFORT, 0x1234, 0x1233,
+                                            0x1232, 0x1231);
+      connection->second->Flush();
+
+      acl_manager_->MasterLinkKey(KeyFlag::TEMPORARY);
+      acl_manager_->SwitchRole(peer, Role::MASTER);
+      acl_manager_->WriteDefaultLinkPolicySettings(0x07);
+      acl_manager_->ReadDefaultLinkPolicySettings();
+      return ::grpc::Status::OK;
+    }
+  }
+
   void on_incoming_acl(std::string address) {
     auto connection = acl_connections_.find(address);
     if (connection == acl_connections_.end()) {
@@ -186,7 +253,20 @@ class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluet
     shared_connection->RegisterDisconnectCallback(
         common::BindOnce(&AclManagerFacadeService::on_disconnect, common::Unretained(this), addr.ToString()),
         facade_handler_);
+    shared_connection->RegisterCallbacks(this, facade_handler_);
     connection_complete_stream_.OnIncomingEvent(shared_connection);
+  }
+
+  void OnMasterLinkKeyComplete(uint16_t connection_handle, KeyFlag key_flag) override {
+    LOG_DEBUG("OnMasterLinkKeyComplete connection_handle:%d", connection_handle);
+  }
+
+  void OnRoleChange(Address bd_addr, Role new_role) override {
+    LOG_DEBUG("OnRoleChange bd_addr:%s, new_role:%d", bd_addr.ToString().c_str(), (uint8_t)new_role);
+  }
+
+  void OnReadDefaultLinkPolicySettingsComplete(uint16_t default_link_policy_settings) override {
+    LOG_DEBUG("OnReadDefaultLinkPolicySettingsComplete default_link_policy_settings:%d", default_link_policy_settings);
   }
 
   void on_disconnect(std::string address, ErrorCode code) {
@@ -208,6 +288,89 @@ class AclManagerFacadeService : public AclManagerFacade::Service, public ::bluet
     event.mutable_remote()->set_address(address.ToString());
     event.set_reason(static_cast<uint32_t>(reason));
     connection_failed_stream_.OnIncomingEvent(event);
+  }
+
+  void OnConnectionPacketTypeChanged(uint16_t packet_type) override {
+    LOG_DEBUG("OnConnectionPacketTypeChanged packet_type:%d", packet_type);
+  }
+
+  void OnAuthenticationComplete() override {
+    LOG_DEBUG("OnAuthenticationComplete");
+  }
+
+  void OnEncryptionChange(EncryptionEnabled enabled) override {
+    LOG_DEBUG("OnConnectionPacketTypeChanged enabled:%d", (uint8_t)enabled);
+  }
+
+  void OnChangeConnectionLinkKeyComplete() override {
+    LOG_DEBUG("OnChangeConnectionLinkKeyComplete");
+  };
+
+  void OnReadClockOffsetComplete(uint16_t clock_offset) override {
+    LOG_DEBUG("OnReadClockOffsetComplete clock_offset:%d", clock_offset);
+  };
+
+  void OnModeChange(Mode current_mode, uint16_t interval) override {
+    LOG_DEBUG("OnModeChange Mode:%d, interval:%d", (uint8_t)current_mode, interval);
+  };
+
+  void OnQosSetupComplete(ServiceType service_type, uint32_t token_rate, uint32_t peak_bandwidth, uint32_t latency,
+                          uint32_t delay_variation) override {
+    LOG_DEBUG("OnQosSetupComplete service_type:%d, token_rate:%d, peak_bandwidth:%d, latency:%d, delay_variation:%d",
+              (uint8_t)service_type, token_rate, peak_bandwidth, latency, delay_variation);
+  }
+
+  void OnFlowSpecificationComplete(FlowDirection flow_direction, ServiceType service_type, uint32_t token_rate,
+                                   uint32_t token_bucket_size, uint32_t peak_bandwidth,
+                                   uint32_t access_latency) override {
+    LOG_DEBUG(
+        "OnFlowSpecificationComplete flow_direction:%d. service_type:%d, token_rate:%d, token_bucket_size:%d, "
+        "peak_bandwidth:%d, access_latency:%d",
+        (uint8_t)flow_direction, (uint8_t)service_type, token_rate, token_bucket_size, peak_bandwidth, access_latency);
+  }
+
+  void OnFlushOccurred() override {
+    LOG_DEBUG("OnFlushOccurred");
+  }
+
+  void OnRoleDiscoveryComplete(Role current_role) override {
+    LOG_DEBUG("OnRoleDiscoveryComplete current_role:%d", (uint8_t)current_role);
+  }
+
+  void OnReadLinkPolicySettingsComplete(uint16_t link_policy_settings) override {
+    LOG_DEBUG("OnReadLinkPolicySettingsComplete link_policy_settings:%d", link_policy_settings);
+  }
+
+  void OnReadAutomaticFlushTimeoutComplete(uint16_t flush_timeout) override {
+    LOG_DEBUG("OnReadAutomaticFlushTimeoutComplete flush_timeout:%d", flush_timeout);
+  }
+
+  void OnReadTransmitPowerLevelComplete(uint8_t transmit_power_level) override {
+    LOG_DEBUG("OnReadTransmitPowerLevelComplete transmit_power_level:%d", transmit_power_level);
+  }
+
+  void OnReadLinkSupervisionTimeoutComplete(uint16_t link_supervision_timeout) override {
+    LOG_DEBUG("OnReadLinkSupervisionTimeoutComplete link_supervision_timeout:%d", link_supervision_timeout);
+  }
+
+  void OnReadFailedContactCounterComplete(uint16_t failed_contact_counter) override {
+    LOG_DEBUG("OnReadFailedContactCounterComplete failed_contact_counter:%d", failed_contact_counter);
+  }
+
+  void OnReadLinkQualityComplete(uint8_t link_quality) override {
+    LOG_DEBUG("OnReadLinkQualityComplete link_quality:%d", link_quality);
+  }
+
+  void OnReadAfhChannelMapComplete(AfhMode afh_mode, std::array<uint8_t, 10> afh_channel_map) {
+    LOG_DEBUG("OnReadAfhChannelMapComplete afh_mode:%d", (uint8_t)afh_mode);
+  }
+
+  void OnReadRssiComplete(uint8_t rssi) override {
+    LOG_DEBUG("OnReadRssiComplete rssi:%d", rssi);
+  }
+
+  void OnReadClockComplete(uint32_t clock, uint16_t accuracy) override {
+    LOG_DEBUG("OnReadClockComplete clock:%d, accuracy:%d", clock, accuracy);
   }
 
   ::grpc::Status FetchConnectionFailed(::grpc::ServerContext* context, const EventStreamRequest* request,
@@ -575,14 +738,6 @@ class ClassicSecurityManagerFacadeService : public ClassicSecurityManagerFacade:
                                        ::google::protobuf::Empty* response) {
     std::unique_lock<std::mutex> lock(mutex_);
     classic_security_manager_->ReadEncryptionKeySize(request->connection_handle());
-    return ::grpc::Status::OK;
-  };
-
-  ::grpc::Status AuthenticationRequested(::grpc::ServerContext* context,
-                                         const ::bluetooth::hci::AuthenticationRequestedMessage* request,
-                                         ::google::protobuf::Empty* response) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    classic_security_manager_->AuthenticationRequested(request->connection_handle());
     return ::grpc::Status::OK;
   };
 

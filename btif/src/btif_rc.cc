@@ -2535,9 +2535,9 @@ static bt_status_t set_volume(uint8_t volume) {
     BTIF_TRACE_DEBUG("%s: Peer supports absolute volume. newVolume: %d",
                      __func__, volume);
 
-    tAVRC_COMMAND avrc_cmd = {.volume = {.opcode = AVRC_OP_VENDOR,
-                                         .pdu = AVRC_PDU_SET_ABSOLUTE_VOLUME,
+    tAVRC_COMMAND avrc_cmd = {.volume = {.pdu = AVRC_PDU_SET_ABSOLUTE_VOLUME,
                                          .status = AVRC_STS_NO_ERROR,
+                                         .opcode = AVRC_OP_VENDOR,
                                          .volume = volume}};
 
     BT_HDR* p_msg = NULL;
@@ -3809,6 +3809,10 @@ static void handle_get_playstatus_response(tBTA_AV_META_MSG* pmeta_msg,
 
 
   if (p_rsp->status == AVRC_STS_NO_ERROR) {
+    do_in_jni_thread(
+        FROM_HERE,
+        base::Bind(bt_rc_ctrl_callbacks->play_status_changed_cb, p_dev->rc_addr,
+                   (btrc_play_status_t)p_rsp->play_status));
     do_in_jni_thread(
         FROM_HERE,
         base::Bind(bt_rc_ctrl_callbacks->play_position_changed_cb,

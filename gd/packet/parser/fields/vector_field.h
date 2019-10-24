@@ -16,12 +16,10 @@
 
 #pragma once
 
-#include "custom_field_def.h"
-#include "enum_def.h"
-#include "fields/count_field.h"
 #include "fields/packet_field.h"
 #include "fields/size_field.h"
 #include "parse_location.h"
+#include "type_def.h"
 
 class VectorField : public PacketField {
  public:
@@ -37,13 +35,17 @@ class VectorField : public PacketField {
 
   virtual Size GetBuilderSize() const override;
 
+  virtual Size GetStructSize() const override;
+
   virtual std::string GetDataType() const override;
 
-  virtual void GenExtractor(std::ostream& s, Size start_offset, Size end_offset) const override;
+  virtual void GenExtractor(std::ostream& s, int num_leading_bits, bool for_struct) const override;
 
   virtual void GenGetter(std::ostream& s, Size start_offset, Size end_offset) const override;
 
   virtual bool GenBuilderParameter(std::ostream& s) const override;
+
+  virtual bool BuilderParameterMustBeMoved() const override;
 
   virtual bool GenBuilderMember(std::ostream& s) const override;
 
@@ -55,22 +57,17 @@ class VectorField : public PacketField {
 
   virtual void GenValidator(std::ostream&) const override;
 
-  bool IsEnumArray() const;
-
-  bool IsCustomFieldArray() const;
-
-  bool IsStructArray() const;
-
   void SetSizeField(const SizeField* size_field);
 
   const std::string& GetSizeModifier() const;
 
   const std::string name_;
 
-  const int element_size_{-1};  // in bits
-  const TypeDef* type_def_{nullptr};
+  const PacketField* element_field_{nullptr};
 
-  // Fixed size array or dynamic size, size is always in bytes, unless it is count.
+  const Size element_size_{};
+
+  // Size is always in bytes, unless it is a count.
   const SizeField* size_field_{nullptr};
 
   // Size modifier is only used when size_field_ is of type SIZE and is not used with COUNT.

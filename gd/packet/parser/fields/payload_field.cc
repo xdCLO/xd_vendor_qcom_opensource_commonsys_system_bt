@@ -54,7 +54,7 @@ std::string PayloadField::GetDataType() const {
   return "PacketView";
 }
 
-void PayloadField::GenExtractor(std::ostream&, Size, Size) const {
+void PayloadField::GenExtractor(std::ostream&, int, bool) const {
   ERROR(this) << __func__ << " should never be called. ";
 }
 
@@ -62,6 +62,7 @@ void PayloadField::GenGetter(std::ostream& s, Size start_offset, Size end_offset
   s << "PacketView<kLittleEndian> GetPayload() const {";
   s << "ASSERT(was_validated_);";
   s << "size_t end_index = size();";
+  s << "auto to_bound = begin();";
   GenBounds(s, start_offset, end_offset, GetSize());
   s << "return GetLittleEndianSubview(field_begin, field_end);";
   s << "}\n\n";
@@ -69,6 +70,7 @@ void PayloadField::GenGetter(std::ostream& s, Size start_offset, Size end_offset
   s << "PacketView<!kLittleEndian> GetPayloadBigEndian() const {";
   s << "ASSERT(was_validated_);";
   s << "size_t end_index = size();";
+  s << "auto to_bound = begin();";
   GenBounds(s, start_offset, end_offset, GetSize());
   s << "return GetBigEndianSubview(field_begin, field_end);";
   s << "}\n";

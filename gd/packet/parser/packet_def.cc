@@ -22,8 +22,8 @@
 #include "fields/all_fields.h"
 #include "util.h"
 
-PacketDef::PacketDef(std::string name, FieldList fields) : ParentDef(name, fields, nullptr){};
-PacketDef::PacketDef(std::string name, FieldList fields, PacketDef* parent) : ParentDef(name, fields, parent){};
+PacketDef::PacketDef(std::string name, FieldList fields) : ParentDef(name, fields, nullptr) {}
+PacketDef::PacketDef(std::string name, FieldList fields, PacketDef* parent) : ParentDef(name, fields, parent) {}
 
 PacketField* PacketDef::GetNewField(const std::string&, ParseLocation) const {
   return nullptr;  // Packets can't be fields
@@ -90,9 +90,8 @@ void PacketDef::GenParserFieldGetter(std::ostream& s, const PacketField* field) 
   auto end_field_offset = GetOffsetForField(field->GetName(), true);
 
   if (start_field_offset.empty() && end_field_offset.empty()) {
-    std::cerr << "Field location for " << field->GetName() << " is ambiguous, "
-              << "no method exists to determine field location from begin() or end().\n";
-    abort();
+    ERROR(field) << "Field location for " << field->GetName() << " is ambiguous, "
+                 << "no method exists to determine field location from begin() or end().\n";
   }
 
   field->GenGetter(s, start_field_offset, end_field_offset);
@@ -106,7 +105,9 @@ void PacketDef::GenValidator(std::ostream& s) const {
   // Get the static offset for all of our fields.
   int bits_size = 0;
   for (const auto& field : fields_) {
-    bits_size += field->GetSize().bits();
+    if (field->GetFieldType() != PaddingField::kFieldType) {
+      bits_size += field->GetSize().bits();
+    }
   }
 
   // Write the function declaration.
@@ -284,6 +285,9 @@ void PacketDef::GenBuilderDefinition(std::ostream& s) const {
 
   GenTestDefine(s);
   s << "\n";
+
+  GenFuzzTestDefine(s);
+  s << "\n";
 }
 
 void PacketDef::GenTestDefine(std::ostream& s) const {
@@ -335,6 +339,44 @@ void PacketDef::GenTestDefine(std::ostream& s) const {
   s << "\n#endif";
 }
 
+void PacketDef::GenFuzzTestDefine(std::ostream& s) const {
+  s << "#ifdef PACKET_FUZZ_TESTING\n";
+  s << "#define DEFINE_" << name_ << "ReflectionFuzzTest ";
+  s << "void Run" << name_ << "ReflectionFuzzTest(const uint8_t* data, size_t size) {";
+  s << "auto vec = std::make_shared<std::vector<uint8_t>>(data, data + size);";
+  s << name_ << "View view = " << name_ << "View::Create(";
+  auto ancestor_ptr = parent_;
+  size_t parent_parens = 0;
+  while (ancestor_ptr != nullptr) {
+    s << ancestor_ptr->name_ << "View::Create(";
+    parent_parens++;
+    ancestor_ptr = ancestor_ptr->parent_;
+  }
+  s << "vec";
+  for (size_t i = 0; i < parent_parens; i++) {
+    s << ")";
+  }
+  s << ");";
+  s << "if (!view.IsValid()) { return; }";
+  s << "auto packet = " << name_ << "Builder::Create(";
+  FieldList params = GetParamList().GetFieldsWithoutTypes({
+      BodyField::kFieldType,
+  });
+  for (int i = 0; i < params.size(); i++) {
+    params[i]->GenBuilderParameterFromView(s);
+    if (i != params.size() - 1) {
+      s << ", ";
+    }
+  }
+  s << ");";
+  s << "std::shared_ptr<std::vector<uint8_t>> packet_bytes = std::make_shared<std::vector<uint8_t>>();";
+  s << "packet_bytes->reserve(packet->size());";
+  s << "BitInserter it(*packet_bytes);";
+  s << "packet->Serialize(it);";
+  s << "}";
+  s << "\n#endif";
+}
+
 FieldList PacketDef::GetParametersToValidate() const {
   FieldList params_to_validate;
   for (const auto& field : GetParamList()) {
@@ -366,7 +408,11 @@ void PacketDef::GenBuilderCreate(std::ostream& s) const {
   });
   // Add the parameters.
   for (int i = 0; i < params.size(); i++) {
-    s << params[i]->GetName();
+    if (params[i]->BuilderParameterMustBeMoved()) {
+      s << "std::move(" << params[i]->GetName() << ")";
+    } else {
+      s << params[i]->GetName();
+    }
     if (i != params.size() - 1) {
       s << ", ";
     }
@@ -419,7 +465,11 @@ void PacketDef::GenBuilderConstructor(std::ostream& s) const {
       s << ", ";
     }
   }
-  s << ") :";
+  if (params.size() > 0 || parent_constraints_.size() > 0) {
+    s << ") :";
+  } else {
+    s << ")";
+  }
 
   // Get the list of parent params to call the parent constructor with.
   FieldList parent_params;
@@ -469,7 +519,11 @@ void PacketDef::GenBuilderConstructor(std::ostream& s) const {
   }
   for (int i = 0; i < saved_params.size(); i++) {
     const auto& saved_param_name = saved_params[i]->GetName();
-    s << saved_param_name << "_(" << saved_param_name << ")";
+    if (saved_params[i]->BuilderParameterMustBeMoved()) {
+      s << saved_param_name << "_(std::move(" << saved_param_name << "))";
+    } else {
+      s << saved_param_name << "_(" << saved_param_name << ")";
+    }
     if (i != saved_params.size() - 1) {
       s << ",";
     }
