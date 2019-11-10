@@ -2,13 +2,14 @@ filegroup {
     name: "BluetoothHciSources",
     srcs: [
         "acl_manager.cc",
-        "classic_security_manager.cc",
-        "controller.cc",
         "address.cc",
+        "classic_security_manager.cc",
         "class_of_device.cc",
+        "controller.cc",
         "device.cc",
         "device_database.cc",
         "hci_layer.cc",
+        "le_advertising_manager.cc",
     ],
 }
 
@@ -41,5 +42,12 @@ filegroup {
     name: "BluetoothCertSource_hci_layer",
     srcs: [
         "cert/cert.cc",
+    ],
+}
+
+filegroup {
+    name: "BluetoothHciFuzzTestSources",
+    srcs: [
+        "hci_packets_fuzz_test.cc",
     ],
 }
