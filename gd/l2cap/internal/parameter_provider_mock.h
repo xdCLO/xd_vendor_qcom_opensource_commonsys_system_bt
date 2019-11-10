@@ -28,6 +28,7 @@ namespace testing {
 class MockParameterProvider : public ParameterProvider {
  public:
   MOCK_METHOD(std::chrono::milliseconds, GetClassicLinkIdleDisconnectTimeout, (), (override));
+  MOCK_METHOD(std::chrono::milliseconds, GetLeLinkIdleDisconnectTimeout, (), (override));
 };
 
 }  // namespace testing

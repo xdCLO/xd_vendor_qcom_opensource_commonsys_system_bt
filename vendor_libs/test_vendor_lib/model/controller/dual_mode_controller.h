@@ -124,8 +124,17 @@ class DualModeController : public Device {
   // 7.1.16
   void HciSetConnectionEncryption(packets::PacketView<true> args);
 
+  // 7.1.17
+  void HciChangeConnectionLinkKey(packets::PacketView<true> args);
+
+  // 7.1.18
+  void HciMasterLinkKey(packets::PacketView<true> args);
+
   // 7.1.19
   void HciRemoteNameRequest(packets::PacketView<true> args);
+
+  // 7.2.8
+  void HciSwitchRole(packets::PacketView<true> args);
 
   // 7.1.21
   void HciReadRemoteSupportedFeatures(packets::PacketView<true> args);
@@ -166,11 +175,26 @@ class DualModeController : public Device {
   // Link Policy Commands
   // Bluetooth Core Specification Version 4.2 Volume 2 Part E 7.2
 
+  // 7.2.1
+  void HciHoldMode(packets::PacketView<true> args);
+
+  // 7.2.2
+  void HciSniffMode(packets::PacketView<true> args);
+
+  // 7.2.3
+  void HciExitSniffMode(packets::PacketView<true> args);
+
+  // 7.2.6
+  void HciQosSetup(packets::PacketView<true> args);
+
   // 7.2.10
   void HciWriteLinkPolicySettings(packets::PacketView<true> args);
 
   // 7.2.12
   void HciWriteDefaultLinkPolicySettings(packets::PacketView<true> args);
+
+  // 7.2.13
+  void HciFlowSpecification(packets::PacketView<true> args);
 
   // 7.2.14
   void HciSniffSubrating(packets::PacketView<true> args);

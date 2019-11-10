@@ -27,6 +27,7 @@ namespace testing {
 class MockAclConnection : public AclConnection {
  public:
   MOCK_METHOD(Address, GetAddress, (), (const, override));
+  MOCK_METHOD(AddressType, GetAddressType, (), (const, override));
   MOCK_METHOD(void, RegisterDisconnectCallback,
               (common::OnceCallback<void(ErrorCode)> on_disconnect, os::Handler* handler), (override));
   MOCK_METHOD(bool, Disconnect, (DisconnectReason reason), (override));
@@ -37,8 +38,9 @@ class MockAclConnection : public AclConnection {
 class MockAclManager : public AclManager {
  public:
   MOCK_METHOD(void, RegisterCallbacks, (ConnectionCallbacks * callbacks, os::Handler* handler), (override));
+  MOCK_METHOD(void, RegisterLeCallbacks, (LeConnectionCallbacks * callbacks, os::Handler* handler), (override));
   MOCK_METHOD(void, CreateConnection, (Address address), (override));
-  MOCK_METHOD(void, CreateLeConnection, (Address address, AddressType address_type), (override));
+  MOCK_METHOD(void, CreateLeConnection, (AddressWithType address_with_type), (override));
   MOCK_METHOD(void, CancelConnect, (Address address), (override));
 };
 

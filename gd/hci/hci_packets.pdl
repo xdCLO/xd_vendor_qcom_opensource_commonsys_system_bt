@@ -9,7 +9,8 @@ enum Enable : 8 {
 }
 
 // https://www.bluetooth.com/specifications/assigned-numbers/generic-access-profile
-enum GapDataTypes : 8 {
+enum GapDataType : 8 {
+  INVALID = 0x00,
   FLAGS = 0x01,
   INCOMPLETE_LIST_16_BIT_UUIDS = 0x02,
   COMPLETE_LIST_16_BIT_UUIDS = 0x03,
@@ -21,6 +22,12 @@ enum GapDataTypes : 8 {
   COMPLETE_LOCAL_NAME = 0x09,
   TX_POWER_LEVEL = 0x0A,
   CLASS_OF_DEVICE = 0x0D,
+}
+
+struct GapData {
+  _size_(data) : 8, // Including one byte for data_type
+  data_type : GapDataType,
+  data : 8[+1*8],
 }
 
 // HCI ACL Packets
@@ -542,6 +549,7 @@ packet ConnectionManagementCommand : CommandPacket { _payload_, }
 packet SecurityCommand : CommandPacket { _payload_, }
 packet ScoConnectionCommand : CommandPacket { _payload_, }
 packet LeAdvertisingCommand : CommandPacket { _payload_, }
+packet LeScanningCommand : CommandPacket { _payload_, }
 packet LeConnectionManagementCommand : CommandPacket { _payload_, }
 packet LeSecurityCommand : CommandPacket { _payload_, }
 packet VendorCommand : CommandPacket { _payload_, }
@@ -577,7 +585,7 @@ enum EventCode : 8 {
   DATA_BUFFER_OVERFLOW = 0x1A,
   MAX_SLOTS_CHANGE = 0x1B,
   READ_CLOCK_OFFSET_COMPLETE = 0x1C,
-  CONNECTION_PACKET_TYPE_CHANGE = 0x1D,
+  CONNECTION_PACKET_TYPE_CHANGED = 0x1D,
   QOS_VIOLATION = 0x1E,
   PAGE_SCAN_REPETITION_MODE_CHANGE = 0x20,
   FLOW_SPECIFICATION_COMPLETE = 0x21,
@@ -697,10 +705,15 @@ packet CommandStatus : EventPacket (event_code = COMMAND_STATUS){
 packet NoCommandComplete : CommandComplete (command_op_code = NONE){
 }
 
+struct Lap { // Lower Address Part
+  lap : 6,
+  _reserved_ : 2,
+  _fixed_ = 0x9e8b : 16,
+}
+
   // LINK_CONTROL
 packet Inquiry : DiscoveryCommand (op_code = INQUIRY) {
-  lap0 : 8, // 0x00 - 0x3F
-  _fixed_ = 0x9E8B : 16, // LAP upper bits are _fixed_
+  lap : Lap,
   inquiry_length : 8, // 0x1 - 0x30 (times 1.28s)
   num_responses : 8, // 0x00 unlimited
 }
@@ -716,7 +729,11 @@ packet InquiryCancelComplete : CommandComplete (command_op_code = INQUIRY_CANCEL
 }
 
 packet PeriodicInquiryMode : DiscoveryCommand (op_code = PERIODIC_INQUIRY_MODE) {
-  _payload_,  // placeholder (unimplemented)
+  max_period_length : 16, // Range 0x0003 to 0xffff (times 1.28s)
+  min_period_length : 16, // Range 0x0002 to 0xfffe (times 1.28s)
+  lap : Lap,
+  inquiry_length : 8, // 0x1 - 0x30 (times 1.28s)
+  num_responses : 8, // 0x00 unlimited
 }
 
 packet PeriodicInquiryModeComplete : CommandComplete (command_op_code = PERIODIC_INQUIRY_MODE) {
@@ -1090,53 +1107,163 @@ packet EnhancedAcceptSynchronousConnection : ScoConnectionCommand (op_code = ENH
 
   // LINK_POLICY
 packet HoldMode : ConnectionManagementCommand (op_code = HOLD_MODE) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+  hold_mode_max_interval: 16, // 0x0002-0xFFFE (1.25ms-40.9s)
+  hold_mode_min_interval: 16, // 0x0002-0xFFFE (1.25ms-40.9s)
 }
+
+packet HoldModeStatus : CommandStatus (command_op_code = HOLD_MODE) {
+}
+
 
 packet SniffMode : ConnectionManagementCommand (op_code = SNIFF_MODE) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+  sniff_max_interval: 16, // 0x0002-0xFFFE (1.25ms-40.9s)
+  sniff_min_interval: 16, // 0x0002-0xFFFE (1.25ms-40.9s)
+  sniff_attempt: 16, // 0x0001-0x7FFF (1.25ms-40.9s)
+  sniff_timeout: 16, // 0x0000-0x7FFF (0ms-40.9s)
 }
 
+packet SniffModeStatus : CommandStatus (command_op_code = SNIFF_MODE) {
+}
+
+
 packet ExitSniffMode : ConnectionManagementCommand (op_code = EXIT_SNIFF_MODE) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+}
+
+packet ExitSniffModeStatus : CommandStatus (command_op_code = EXIT_SNIFF_MODE) {
+}
+
+enum ServiceType : 8 {
+  NO_TRAFFIC = 0x00,
+  BEST_EFFORT = 0x01,
+  GUARANTEED = 0x02,
 }
 
 packet QosSetup : ConnectionManagementCommand (op_code = QOS_SETUP) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+  _reserved_ : 8,
+  service_type : ServiceType,
+  token_rate : 32, // Octets/s
+  peak_bandwidth : 32, // Octets/s
+  latency : 32, // Octets/s
+  delay_variation : 32, // microseconds
+}
+
+packet QosSetupStatus : CommandStatus (command_op_code = QOS_SETUP) {
 }
 
 packet RoleDiscovery : ConnectionManagementCommand (op_code = ROLE_DISCOVERY) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+}
+
+enum Role : 8 {
+  MASTER = 0x00,
+  SLAVE = 0x01,
+}
+
+packet RoleDiscoveryComplete : CommandComplete (command_op_code = ROLE_DISCOVERY) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  current_role : Role,
 }
 
 packet SwitchRole : ConnectionManagementCommand (op_code = SWITCH_ROLE) {
-  _payload_,  // placeholder (unimplemented)
+  bd_addr : Address,
+  role : Role,
 }
 
+packet SwitchRoleStatus : CommandStatus (command_op_code = SWITCH_ROLE) {
+}
+
+
 packet ReadLinkPolicySettings : ConnectionManagementCommand (op_code = READ_LINK_POLICY_SETTINGS) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+}
+
+enum LinkPolicy : 16 {
+  ENABLE_ROLE_SWITCH = 0x01,
+  ENABLE_HOLD_MODE = 0x02,
+  ENABLE_SNIFF_MODE = 0x04,
+  ENABLE_PARK_MODE = 0x08, // deprecated after 5.0
+}
+
+packet ReadLinkPolicySettingsComplete : CommandComplete (command_op_code = READ_LINK_POLICY_SETTINGS) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  link_policy_settings : 16,
 }
 
 packet WriteLinkPolicySettings : ConnectionManagementCommand (op_code = WRITE_LINK_POLICY_SETTINGS) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+  link_policy_settings : 16,
+}
+
+packet WriteLinkPolicySettingsComplete : CommandComplete (command_op_code = WRITE_LINK_POLICY_SETTINGS) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
 }
 
 packet ReadDefaultLinkPolicySettings : ConnectionManagementCommand (op_code = READ_DEFAULT_LINK_POLICY_SETTINGS) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+packet ReadDefaultLinkPolicySettingsComplete : CommandComplete (command_op_code = READ_DEFAULT_LINK_POLICY_SETTINGS) {
+  status : ErrorCode,
+  default_link_policy_settings : 16,
 }
 
 packet WriteDefaultLinkPolicySettings : ConnectionManagementCommand (op_code = WRITE_DEFAULT_LINK_POLICY_SETTINGS) {
-  _payload_,  // placeholder (unimplemented)
+  default_link_policy_settings : 16,
+}
+
+packet WriteDefaultLinkPolicySettingsComplete : CommandComplete (command_op_code = WRITE_DEFAULT_LINK_POLICY_SETTINGS) {
+  status : ErrorCode,
+}
+
+enum FlowDirection : 8 {
+  OUTGOING_FLOW = 0x00,
+  INCOMING_FLOW = 0x01,
 }
 
 packet FlowSpecification : ConnectionManagementCommand (op_code = FLOW_SPECIFICATION) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+  _reserved_ : 8,
+  flow_direction : FlowDirection,
+  service_type : ServiceType,
+  token_rate : 32, // Octets/s
+  token_bucket_size : 32,
+  peak_bandwidth : 32, // Octets/s
+  access_latency : 32, // Octets/s
+}
+
+packet FlowSpecificationStatus : CommandStatus (command_op_code = FLOW_SPECIFICATION) {
 }
 
 packet SniffSubrating : ConnectionManagementCommand (op_code = SNIFF_SUBRATING) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+  maximum_latency : 16,  // 0x0002-0xFFFE (1.25ms-40.9s)
+  minimum_remote_timeout : 16, // 0x0000-0xFFFE (0-40.9s)
+  minimum_local_timeout: 16, // 0x0000-0xFFFE (0-40.9s)
 }
 
+packet SniffSubratingComplete : CommandComplete (command_op_code = SNIFF_SUBRATING) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+}
 
   // CONTROLLER_AND_BASEBAND
 packet SetEventMask : CommandPacket (op_code = SET_EVENT_MASK) {
@@ -1222,7 +1349,14 @@ packet SetEventFilterConnectionSetupAddress : SetEventFilterConnectionSetup (fil
 }
 
 packet Flush : ConnectionManagementCommand (op_code = FLUSH) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+}
+
+packet FlushComplete : CommandComplete (command_op_code = FLUSH) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
 }
 
 packet ReadPinType : CommandPacket (op_code = READ_PIN_TYPE) {
@@ -1308,11 +1442,19 @@ packet WriteConnectionAcceptTimeout : ConnectionManagementCommand (op_code = WRI
 }
 
 packet ReadPageTimeout : DiscoveryCommand (op_code = READ_PAGE_TIMEOUT) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+packet ReadPageTimeoutComplete : CommandComplete (command_op_code = READ_PAGE_TIMEOUT) {
+  status : ErrorCode,
+  page_timeout : 16,
 }
 
 packet WritePageTimeout : DiscoveryCommand (op_code = WRITE_PAGE_TIMEOUT) {
-  _payload_,  // placeholder (unimplemented)
+  page_timeout : 16,
+}
+
+packet WritePageTimeoutComplete : CommandComplete (command_op_code = WRITE_PAGE_TIMEOUT) {
+  status : ErrorCode,
 }
 
 enum ScanEnable : 8 {
@@ -1357,11 +1499,21 @@ packet WritePageScanActivityComplete : CommandComplete (command_op_code = WRITE_
 }
 
 packet ReadInquiryScanActivity : DiscoveryCommand (op_code = READ_INQUIRY_SCAN_ACTIVITY) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+packet ReadInquiryScanActivityComplete : CommandComplete (command_op_code = READ_INQUIRY_SCAN_ACTIVITY) {
+  status : ErrorCode,
+  inquiry_scan_interval : 16, // Range: 0x0012 to 0x1000; only even values are valid * 0x625 ms
+  inquiry_scan_window : 16, // Range: 0x0011 to 0x1000
 }
 
 packet WriteInquiryScanActivity : DiscoveryCommand (op_code = WRITE_INQUIRY_SCAN_ACTIVITY) {
-  _payload_,  // placeholder (unimplemented)
+  inquiry_scan_interval : 16, // Range: 0x0012 to 0x1000; only even values are valid * 0x625 ms
+  inquiry_scan_window : 16, // Range: 0x0011 to 0x1000
+}
+
+packet WriteInquiryScanActivityComplete : CommandComplete (command_op_code = WRITE_INQUIRY_SCAN_ACTIVITY) {
+  status : ErrorCode,
 }
 
 enum AuthenticationEnable : 8 {
@@ -1410,11 +1562,27 @@ packet WriteVoiceSetting : CommandPacket (op_code = WRITE_VOICE_SETTING) {
 }
 
 packet ReadAutomaticFlushTimeout : ConnectionManagementCommand (op_code = READ_AUTOMATIC_FLUSH_TIMEOUT) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+}
+
+packet ReadAutomaticFlushTimeoutComplete : CommandComplete (command_op_code = READ_AUTOMATIC_FLUSH_TIMEOUT) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  flush_timeout : 16,
 }
 
 packet WriteAutomaticFlushTimeout : ConnectionManagementCommand (op_code = WRITE_AUTOMATIC_FLUSH_TIMEOUT) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+  flush_timeout : 16, // 0x0000-0x07FF Default 0x0000 (No Automatic Flush)
+}
+
+packet WriteAutomaticFlushTimeoutComplete : CommandComplete (command_op_code = WRITE_AUTOMATIC_FLUSH_TIMEOUT) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
 }
 
 packet ReadNumBroadcastRetransmits : CommandPacket (op_code = READ_NUM_BROADCAST_RETRANSMITS) {
@@ -1433,8 +1601,24 @@ packet WriteHoldModeActivity : CommandPacket (op_code = WRITE_HOLD_MODE_ACTIVITY
   _payload_,  // placeholder (unimplemented)
 }
 
+
+enum TransmitPowerLevelType : 8 {
+  CURRENT = 0x00,
+  MAXIMUM = 0x01,
+}
+
 packet ReadTransmitPowerLevel : ConnectionManagementCommand (op_code = READ_TRANSMIT_POWER_LEVEL) {
-  _payload_,  // placeholder (unimplemented)
+  connection_handle : 12,
+  _reserved_ : 4,
+  type : TransmitPowerLevelType,
+
+}
+
+packet ReadTransmitPowerLevelComplete : CommandComplete (command_op_code = READ_TRANSMIT_POWER_LEVEL) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  transmit_power_level : 8,
 }
 
 packet ReadSynchronousFlowControlEnable : CommandPacket (op_code = READ_SYNCHRONOUS_FLOW_CONTROL_ENABLE) {
@@ -1482,7 +1666,7 @@ packet ReadLinkSupervisionTimeout : ConnectionManagementCommand (op_code = READ_
 
 packet ReadLinkSupervisionTimeoutComplete : CommandComplete (command_op_code = READ_LINK_SUPERVISION_TIMEOUT) {
   status : ErrorCode,
-  handle : 12,
+  connection_handle : 12,
   _reserved_ : 4,
   link_supervision_timeout : 16, // 0x001-0xFFFF (0.625ms-40.9s)
 }
@@ -1495,20 +1679,34 @@ packet WriteLinkSupervisionTimeout : ConnectionManagementCommand (op_code = WRIT
 
 packet WriteLinkSupervisionTimeoutComplete : CommandComplete (command_op_code = WRITE_LINK_SUPERVISION_TIMEOUT) {
   status : ErrorCode,
-  handle : 12,
+  connection_handle : 12,
   _reserved_ : 4,
 }
 
 packet ReadNumberOfSupportedIac : DiscoveryCommand (op_code = READ_NUMBER_OF_SUPPORTED_IAC) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+packet ReadNumberOfSupportedIacComplete : CommandComplete (command_op_code = READ_NUMBER_OF_SUPPORTED_IAC) {
+  status : ErrorCode,
+  num_support_iac : 8,
 }
 
 packet ReadCurrentIacLap : DiscoveryCommand (op_code = READ_CURRENT_IAC_LAP) {
-  _payload_,  // placeholder (unimplemented)
+}
+
+packet ReadCurrentIacLapComplete : CommandComplete (command_op_code = READ_CURRENT_IAC_LAP) {
+  status : ErrorCode,
+  _count_(laps_to_read) : 8,
+  laps_to_read : Lap[],
 }
 
 packet WriteCurrentIacLap : DiscoveryCommand (op_code = WRITE_CURRENT_IAC_LAP) {
-  _payload_,  // placeholder (unimplemented)
+  _count_(laps_to_write) : 8,
+  laps_to_write : Lap[],
+}
+
+packet WriteCurrentIacLapComplete : CommandComplete (command_op_code = WRITE_CURRENT_IAC_LAP) {
+  status : ErrorCode,
 }
 
 packet SetAfhHostChannelClassification : CommandPacket (op_code = SET_AFH_HOST_CHANNEL_CLASSIFICATION) {
@@ -1598,12 +1796,14 @@ packet ReadExtendedInquiryResponse : CommandPacket (op_code = READ_EXTENDED_INQU
 packet ReadExtendedInquiryResponseComplete : CommandComplete (command_op_code = READ_EXTENDED_INQUIRY_RESPONSE) {
   status : ErrorCode,
   fec_required : FecRequired,
-  _payload_,
+  extended_inquiry_response : GapData[],
 }
 
 packet WriteExtendedInquiryResponse : CommandPacket (op_code = WRITE_EXTENDED_INQUIRY_RESPONSE) {
   fec_required : FecRequired,
-  _payload_,
+  extended_inquiry_response : GapData[],
+  //_payload_, // Zero padding to be 240 octets
+  // Should it be GapData[240] ?
 }
 
 packet WriteExtendedInquiryResponseComplete : CommandComplete (command_op_code = WRITE_EXTENDED_INQUIRY_RESPONSE) {
@@ -1732,7 +1932,7 @@ packet ReadLocalVersionInformation : CommandPacket (op_code = READ_LOCAL_VERSION
 }
 
 enum HciVersion : 8 {
-  V_1_0b = 0x00,
+  V_1_0B = 0x00,
   V_1_1 = 0x01,
   V_1_2 = 0x02,
   V_2_0 = 0x03, //  + EDR
@@ -1746,7 +1946,7 @@ enum HciVersion : 8 {
 }
 
 enum LmpVersion : 8 {
-  V_1_0b = 0x00, // withdrawn
+  V_1_0B = 0x00, // withdrawn
   V_1_1 = 0x01, // withdrawn
   V_1_2 = 0x02, // withdrawn
   V_2_0 = 0x03, //  + EDR
@@ -1827,29 +2027,70 @@ packet ReadLocalSupportedCodecs : CommandPacket (op_code = READ_LOCAL_SUPPORTED_
 
   // STATUS_PARAMETERS
 packet ReadFailedContactCounter : ConnectionManagementCommand (op_code = READ_FAILED_CONTACT_COUNTER) {
-  handle : 12,
+  connection_handle : 12,
   _reserved_ : 4,
 }
 
+packet ReadFailedContactCounterComplete : CommandComplete (command_op_code = READ_FAILED_CONTACT_COUNTER) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  failed_contact_counter : 16,
+}
+
 packet ResetFailedContactCounter : ConnectionManagementCommand (op_code = RESET_FAILED_CONTACT_COUNTER) {
-  handle : 12,
+  connection_handle : 12,
+  _reserved_ : 4,
+}
+
+packet ResetFailedContactCounterComplete : CommandComplete (command_op_code = RESET_FAILED_CONTACT_COUNTER) {
+  status : ErrorCode,
+  connection_handle : 12,
   _reserved_ : 4,
 }
 
 packet ReadLinkQuality : ConnectionManagementCommand (op_code = READ_LINK_QUALITY) {
-  handle : 12,
+  connection_handle : 12,
   _reserved_ : 4,
 }
 
-packet ReadRssi : ConnectionManagementCommand (op_code = READ_RSSI) {
-  handle : 12,
+packet ReadLinkQualityComplete : CommandComplete (command_op_code = READ_LINK_QUALITY) {
+  status : ErrorCode,
+  connection_handle : 12,
   _reserved_ : 4,
+  link_quality : 8,
+}
+
+packet ReadRssi : ConnectionManagementCommand (op_code = READ_RSSI) {
+  connection_handle : 12,
+  _reserved_ : 4,
+}
+
+packet ReadRssiComplete : CommandComplete (command_op_code = READ_RSSI) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  rssi : 8,
 }
 
 packet ReadAfhChannelMap : ConnectionManagementCommand (op_code = READ_AFH_CHANNEL_MAP) {
   connection_handle : 12,
   _reserved_ : 4,
 }
+
+enum AfhMode : 8 {
+  AFH_DISABLED = 0x00,
+  AFH_ENABLED = 0x01,
+}
+
+packet ReadAfhChannelMapComplete : CommandComplete (command_op_code = READ_AFH_CHANNEL_MAP) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  afh_mode : AfhMode,
+  afh_channel_map : 8[10],
+}
+
 
 enum WhichClock : 8 {
   LOCAL = 0x00,
@@ -1860,6 +2101,15 @@ packet ReadClock : ConnectionManagementCommand (op_code = READ_CLOCK) {
   connection_handle : 12,
   _reserved_ : 4,
   which_clock : WhichClock,
+}
+
+packet ReadClockComplete : CommandComplete (command_op_code = READ_CLOCK) {
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  clock : 28,
+  _reserved_ : 4,
+  accuracy : 16,
 }
 
 packet ReadEncryptionKeySize : SecurityCommand (op_code = READ_ENCRYPTION_KEY_SIZE) {
@@ -2006,7 +2256,9 @@ packet LeReadAdvertisingChannelTxPowerComplete : CommandComplete (command_op_cod
 }
 
 packet LeSetAdvertisingData : LeAdvertisingCommand (op_code = LE_SET_ADVERTISING_DATA) {
-  _payload_,
+  _size_(advertising_data) : 8,
+  advertising_data : GapData[],
+  _payload_, // Zero padding to 31 bytes of advertising_data
 }
 
 packet LeSetAdvertisingDataComplete : CommandComplete (command_op_code = LE_SET_ADVERTISING_DATA) {
@@ -2014,7 +2266,9 @@ packet LeSetAdvertisingDataComplete : CommandComplete (command_op_code = LE_SET_
 }
 
 packet LeSetScanResponseData : LeAdvertisingCommand (op_code = LE_SET_SCAN_RESPONSE_DATA) {
-  _payload_,
+  _size_(advertising_data) : 8,
+  advertising_data : GapData[],
+  _payload_, // Zero padding to 31 bytes of advertising_data
 }
 
 packet LeSetScanResponseDataComplete : CommandComplete (command_op_code = LE_SET_SCAN_RESPONSE_DATA) {
@@ -2041,7 +2295,7 @@ enum LeSetScanningFilterPolicy : 8 {
   WHITE_LIST_AND_INITIATORS_IDENTITY = 0x03,
 }
 
-packet LeSetScanParameters : LeAdvertisingCommand (op_code = LE_SET_SCAN_PARAMETERS) {
+packet LeSetScanParameters : LeScanningCommand (op_code = LE_SET_SCAN_PARAMETERS) {
   le_scan_type : LeScanType,
   le_scan_interval : 16, // 0x0004-0x4000 Default 0x10 (10ms)
   le_scan_window : 16, // Default 0x10 (10ms)
@@ -2053,7 +2307,7 @@ packet LeSetScanParametersComplete : CommandComplete (command_op_code = LE_SET_S
   status : ErrorCode,
 }
 
-packet LeSetScanEnable : LeAdvertisingCommand (op_code = LE_SET_SCAN_ENABLE) {
+packet LeSetScanEnable : LeScanningCommand (op_code = LE_SET_SCAN_ENABLE) {
   le_scan_enable : Enable,
   filter_duplicates : Enable,
 }
@@ -2612,12 +2866,6 @@ packet ReadRemoteVersionInformationComplete : EventPacket (event_code = READ_REM
   sub_version : 8,
 }
 
-enum ServiceType : 8 {
-  NO_TRAFFIC = 0x00,
-  BEST_EFFORT = 0x01,
-  GUARANTEED = 0x02,
-}
-
 packet QosSetupComplete : EventPacket (event_code = QOS_SETUP_COMPLETE){
   status : ErrorCode,
   connection_handle : 12,
@@ -2639,11 +2887,6 @@ packet HardwareError : EventPacket (event_code = HARDWARE_ERROR){
 packet FlushOccurred : EventPacket (event_code = FLUSH_OCCURRED){
   connection_handle : 12,
   _reserved_ : 4,
-}
-
-enum Role : 8 {
-  MASTER = 0x00,
-  SLAVE = 0x01,
 }
 
 packet RoleChange : EventPacket (event_code = ROLE_CHANGE){
@@ -2709,7 +2952,7 @@ packet ReadClockOffsetComplete : EventPacket (event_code = READ_CLOCK_OFFSET_COM
   _reserved_ : 1,
 }
 
-packet ConnectionPacketTypeChange : EventPacket (event_code = CONNECTION_PACKET_TYPE_CHANGE){
+packet ConnectionPacketTypeChanged : EventPacket (event_code = CONNECTION_PACKET_TYPE_CHANGED){
   status : ErrorCode,
   connection_handle : 12,
   _reserved_ : 4,
@@ -2725,7 +2968,16 @@ packet PageScanRepetitionModeChange : EventPacket (event_code = PAGE_SCAN_REPETI
 }
 
 packet FlowSpecificationComplete : EventPacket (event_code = FLOW_SPECIFICATION_COMPLETE){
-  _payload_, // placeholder (unimplemented)
+  status : ErrorCode,
+  connection_handle : 12,
+  _reserved_ : 4,
+  _reserved_ : 8,
+  flow_direction : FlowDirection,
+  service_type : ServiceType,
+  token_rate : 32, // Octets/s
+  token_bucket_size : 32,
+  peak_bandwidth : 32, // Octets/s
+  access_latency : 32, // Octets/s
 }
 
 packet InquiryResultWithRssi : EventPacket (event_code = INQUIRY_RESULT_WITH_RSSI){
@@ -2775,7 +3027,7 @@ packet ExtendedInquiryResult : EventPacket (event_code = EXTENDED_INQUIRY_RESULT
   clock_offset : 15,
   _reserved_ : 1,
   rssi : 8,
-  _payload_,
+  extended_inquiry_response : GapData[],
 }
 
 packet EncryptionKeyRefreshComplete : EventPacket (event_code = ENCRYPTION_KEY_REFRESH_COMPLETE){
@@ -2868,7 +3120,7 @@ packet LeConnectionComplete : LeMetaEvent (subevent_code = CONNECTION_COMPLETE) 
   connection_handle : 12,
   _reserved_ : 4,
   role : Role,
-  peer_address_type : PeerAddressType,
+  peer_address_type : AddressType,
   peer_address : Address,
   conn_interval : 16, // 0x006 - 0x0C80 (7.5ms - 4000ms)
   conn_latency : 16,  // Number of connection events
@@ -2876,8 +3128,18 @@ packet LeConnectionComplete : LeMetaEvent (subevent_code = CONNECTION_COMPLETE) 
   master_clock_accuracy : MasterClockAccuracy,
 }
 
+struct LeAdvertisingReport {
+  event_type : AdvertisingEventType,
+  address_type : AddressType,
+  address : Address,
+  _size_(advertising_data) : 8,
+  advertising_data : GapData[],
+  rssi : 8,
+}
+
 packet LeAdvertisingReport : LeMetaEvent (subevent_code = ADVERTISING_REPORT) {
-  _payload_,
+  _count_(le_advertising_reports) : 8,
+  le_advertising_reports : LeAdvertisingReport[],
 }
 
 packet LeConnectionUpdateComplete : LeMetaEvent (subevent_code = CONNECTION_UPDATE_COMPLETE) {
@@ -2937,7 +3199,7 @@ packet LeEnhancedConnectionComplete : LeMetaEvent (subevent_code = ENHANCED_CONN
   connection_handle : 12,
   _reserved_ : 4,
   role : Role,
-  peer_address_type : PeerAddressType,
+  peer_address_type : AddressType,
   peer_address : Address,
   local_resolvable_private_address : Address,
   peer_resolvable_private_address : Address,

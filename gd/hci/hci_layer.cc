@@ -133,6 +133,42 @@ class LeSecurityInterfaceImpl : public LeSecurityInterface {
   HciLayer& hci_;
 };
 
+class LeAdvertisingInterfaceImpl : public LeAdvertisingInterface {
+ public:
+  LeAdvertisingInterfaceImpl(HciLayer& hci) : hci_(hci) {}
+  virtual ~LeAdvertisingInterfaceImpl() = default;
+
+  virtual void EnqueueCommand(std::unique_ptr<LeAdvertisingCommandBuilder> command,
+                              common::OnceCallback<void(CommandCompleteView)> on_complete,
+                              os::Handler* handler) override {
+    hci_.EnqueueCommand(std::move(command), std::move(on_complete), handler);
+  }
+
+  virtual void EnqueueCommand(std::unique_ptr<LeAdvertisingCommandBuilder> command,
+                              common::OnceCallback<void(CommandStatusView)> on_status, os::Handler* handler) override {
+    hci_.EnqueueCommand(std::move(command), std::move(on_status), handler);
+  }
+  HciLayer& hci_;
+};
+
+class LeScanningInterfaceImpl : public LeScanningInterface {
+ public:
+  LeScanningInterfaceImpl(HciLayer& hci) : hci_(hci) {}
+  virtual ~LeScanningInterfaceImpl() = default;
+
+  virtual void EnqueueCommand(std::unique_ptr<LeScanningCommandBuilder> command,
+                              common::OnceCallback<void(CommandCompleteView)> on_complete,
+                              os::Handler* handler) override {
+    hci_.EnqueueCommand(std::move(command), std::move(on_complete), handler);
+  }
+
+  virtual void EnqueueCommand(std::unique_ptr<LeScanningCommandBuilder> command,
+                              common::OnceCallback<void(CommandStatusView)> on_status, os::Handler* handler) override {
+    hci_.EnqueueCommand(std::move(command), std::move(on_status), handler);
+  }
+  HciLayer& hci_;
+};
+
 struct HciLayer::impl : public hal::HciHalCallbacks {
   impl(HciLayer& module) : hal_(nullptr), module_(module) {}
 
@@ -152,9 +188,6 @@ struct HciLayer::impl : public hal::HciHalCallbacks {
     RegisterEventHandler(EventCode::LE_META_EVENT, Bind(&impl::le_meta_event_callback, common::Unretained(this)),
                          handler);
     // TODO find the right place
-    RegisterEventHandler(EventCode::CONNECTION_PACKET_TYPE_CHANGE, Bind(&impl::drop, common::Unretained(this)),
-                         handler);
-    RegisterEventHandler(EventCode::ROLE_CHANGE, Bind(&impl::drop, common::Unretained(this)), handler);
     RegisterEventHandler(EventCode::PAGE_SCAN_REPETITION_MODE_CHANGE, Bind(&impl::drop, common::Unretained(this)),
                          handler);
     RegisterEventHandler(EventCode::MAX_SLOTS_CHANGE, Bind(&impl::drop, common::Unretained(this)), handler);
@@ -388,6 +421,8 @@ struct HciLayer::impl : public hal::HciHalCallbacks {
   // Interfaces
   SecurityInterfaceImpl security_interface{module_};
   LeSecurityInterfaceImpl le_security_interface{module_};
+  LeAdvertisingInterfaceImpl le_advertising_interface{module_};
+  LeScanningInterfaceImpl le_scanning_interface{module_};
 
   // Command Handling
   std::list<CommandQueueEntry> command_queue_;
@@ -455,6 +490,22 @@ LeSecurityInterface* HciLayer::GetLeSecurityInterface(common::Callback<void(LeMe
     RegisterLeEventHandler(subevent, event_handler, handler);
   }
   return &impl_->le_security_interface;
+}
+
+LeAdvertisingInterface* HciLayer::GetLeAdvertisingInterface(common::Callback<void(LeMetaEventView)> event_handler,
+                                                            os::Handler* handler) {
+  for (const auto subevent : LeAdvertisingInterface::LeAdvertisingEvents) {
+    RegisterLeEventHandler(subevent, event_handler, handler);
+  }
+  return &impl_->le_advertising_interface;
+}
+
+LeScanningInterface* HciLayer::GetLeScanningInterface(common::Callback<void(LeMetaEventView)> event_handler,
+                                                      os::Handler* handler) {
+  for (const auto subevent : LeScanningInterface::LeScanningEvents) {
+    RegisterLeEventHandler(subevent, event_handler, handler);
+  }
+  return &impl_->le_scanning_interface;
 }
 
 const ModuleFactory HciLayer::Factory = ModuleFactory([]() { return new HciLayer(); });

@@ -180,9 +180,14 @@ packet TwoStructs {
   two : TwoRelatedNumbers,
 }
 
-packet ArrayOfStruct {
+packet VectorOfStruct {
   _count_(array) : 8,
   array : TwoRelatedNumbers[],
+}
+
+packet ArrayOfStruct {
+  the_count : 8,
+  array : TwoRelatedNumbers[4],
 }
 
 struct StructWithFixedTypes {
@@ -204,6 +209,32 @@ packet ArrayOfStructAndAnother {
   _count_(array) : 8,
   array : TwoRelatedNumbers[],
   another : TwoRelatedNumbers,
+}
+
+packet SizedArrayOfStructAndAnother {
+  _size_(array) : 8,
+  array : TwoRelatedNumbers[],
+  another : TwoRelatedNumbers,
+}
+
+struct ArrayOfStructAndAnotherStruct {
+  _count_(array) : 8,
+  array : TwoRelatedNumbers[],
+  another : TwoRelatedNumbers,
+}
+
+struct SizedArrayOfStructAndAnotherStruct {
+  _size_(array) : 8,
+  array : TwoRelatedNumbers[],
+  another : TwoRelatedNumbers,
+}
+
+packet OneArrayOfStructAndAnotherStruct {
+  one : ArrayOfStructAndAnotherStruct,
+}
+
+packet OneSizedArrayOfStructAndAnotherStruct {
+  one : SizedArrayOfStructAndAnotherStruct,
 }
 
 group BitFieldGroup {
@@ -270,4 +301,96 @@ packet OneVersionOneStructPacket : OneVersionedStructPacket(version = 0x01) {
 packet OneVersionTwoStructPacket : OneVersionedStructPacket(version = 0x02) {
   one_number : 8,
   another_number : 8,
+}
+
+enum StructType : 8 {
+  ZERO_BYTE = 0x00,
+  TWO_BYTE = 0x02,
+  FOUR_BYTE = 0x04,
+  AT_LEAST_FOUR_BYTE = 0x05,
+  VARIABLE = 0x06,
+}
+
+struct UnusedParentStruct {
+  struct_type : StructType,
+  _body_,
+}
+
+struct TwoByteStruct : UnusedParentStruct (struct_type = TWO_BYTE) {
+  two_bytes : 16,
+}
+
+struct FourByteStruct : UnusedParentStruct (struct_type = FOUR_BYTE) {
+  four_bytes : 32,
+}
+
+struct AtLeastFourByteStruct : UnusedParentStruct (struct_type = AT_LEAST_FOUR_BYTE) {
+  four_bytes : 32,
+  struct_type : StructType,
+  _body_,
+}
+
+struct OnlyFourByteStruct : AtLeastFourByteStruct (struct_type = ZERO_BYTE) {
+}
+
+struct SixByteStruct : AtLeastFourByteStruct (struct_type = TWO_BYTE) {
+  two_bytes : 16,
+}
+
+struct EightByteStruct : AtLeastFourByteStruct (struct_type = FOUR_BYTE) {
+  four_bytes : 32,
+}
+
+packet OneFourByteStruct {
+  one_struct : FourByteStruct,
+}
+
+packet OneGenericStruct {
+  base_struct : UnusedParentStruct,
+}
+
+packet OneGenericStructArray {
+  an_array : UnusedParentStruct[],
+}
+
+packet OneGenericStructFourArray {
+  an_array : UnusedParentStruct[4],
+}
+
+packet ParentWithOnlyFixed {
+  two_bytes : 16,
+  _body_,
+}
+
+packet OneGenericStructArrayAfterFixed : ParentWithOnlyFixed {
+  an_array : UnusedParentStruct[],
+}
+
+enum DataType : 8 {
+  ONE = 0x01,
+  TWO = 0x02,
+  THREE = 0x03,
+  FOUR = 0x04,
+  FIVE = 0x05,
+  UNUSED = 0x06,
+}
+
+struct LengthTypeValueStruct {
+  _size_(value) : 16,
+  type : DataType,
+  value : 8[+1*8],
+}
+
+packet OneLengthTypeValueStruct {
+  one_array : LengthTypeValueStruct[],
+}
+
+packet SizedParent {
+  _size_(payload) : 8,
+  _payload_,
+}
+
+packet OneLengthTypeValueStructPadded : SizedParent {
+  one_array : LengthTypeValueStruct[],
+  _padding_[40],
 }

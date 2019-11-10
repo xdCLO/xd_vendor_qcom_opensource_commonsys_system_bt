@@ -34,9 +34,18 @@ class StructDef : public ParentDef {
 
   TypeDef::Type GetDefinitionType() const;
 
+  void GenSpecialize(std::ostream& s) const;
+
   void GenParse(std::ostream& s) const;
+
+  void GenParseFunctionPrototype(std::ostream& s) const;
 
   void GenDefinition(std::ostream& s) const;
 
   void GenConstructor(std::ostream& s) const;
+
+  Size GetStructOffsetForField(std::string field_name) const;
+
+ private:
+  Size total_size_;
 };
