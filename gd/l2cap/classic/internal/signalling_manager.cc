@@ -52,8 +52,15 @@ ClassicSignallingManager::~ClassicSignallingManager() {
 }
 
 void ClassicSignallingManager::OnCommandReject(CommandRejectView command_reject_view) {
+  if (pending_commands_.empty()) {
+    LOG_WARN("Unexpected command reject: no pending request");
+    return;
+  }
+  auto last_sent_command = std::move(pending_commands_.front());
+  pending_commands_.pop();
+
   SignalId signal_id = command_reject_view.GetIdentifier();
-  if (last_sent_command_.signal_id_ != signal_id) {
+  if (last_sent_command.signal_id_ != signal_id) {
     LOG_WARN("Unknown command reject");
     return;
   }
@@ -140,37 +147,39 @@ void ClassicSignallingManager::OnConnectionRequest(SignalId signal_id, Psm psm, 
   }
   send_connection_response(signal_id, remote_cid, new_channel->GetCid(), ConnectionResponseResult::SUCCESS,
                            ConnectionResponseStatus::NO_FURTHER_INFORMATION_AVAILABLE);
-  std::unique_ptr<DynamicChannel> channel = std::make_unique<DynamicChannel>(new_channel, handler_);
   SendConfigurationRequest(remote_cid, {});
-  dynamic_service_manager_->GetService(psm)->NotifyChannelCreation(std::move(channel));
 }
 
-void ClassicSignallingManager::OnConnectionResponse(SignalId signal_id, Cid cid, Cid remote_cid,
+void ClassicSignallingManager::OnConnectionResponse(SignalId signal_id, Cid remote_cid, Cid cid,
                                                     ConnectionResponseResult result, ConnectionResponseStatus status) {
-  if (last_sent_command_.signal_id_ != signal_id ||
-      last_sent_command_.command_code_ != CommandCode::CONNECTION_REQUEST) {
+  if (pending_commands_.empty()) {
+    LOG_WARN("Unexpected response: no pending request");
+    return;
+  }
+  auto last_sent_command = std::move(pending_commands_.front());
+  pending_commands_.pop();
+  if (last_sent_command.signal_id_ != signal_id || last_sent_command.command_code_ != CommandCode::CONNECTION_REQUEST) {
     LOG_WARN("Received unexpected connection response");
     return;
   }
-  if (last_sent_command_.source_cid_ != cid) {
-    LOG_WARN("SCID doesn't match: expected %d, received %d", last_sent_command_.source_cid_, cid);
+  if (last_sent_command.source_cid_ != cid) {
+    LOG_WARN("SCID doesn't match: expected %d, received %d", last_sent_command.source_cid_, cid);
+    handle_send_next_command();
     return;
   }
   if (result != ConnectionResponseResult::SUCCESS) {
+    handle_send_next_command();
     return;
   }
-  Psm pending_psm = last_sent_command_.psm_;
-  last_sent_command_ = {};
+  Psm pending_psm = last_sent_command.psm_;
   auto new_channel = link_->AllocateReservedDynamicChannel(cid, pending_psm, remote_cid, {});
   if (new_channel == nullptr) {
     LOG_WARN("Can't allocate dynamic channel");
+    handle_send_next_command();
     return;
   }
-  std::unique_ptr<DynamicChannel> channel = std::make_unique<DynamicChannel>(new_channel, handler_);
-  dynamic_service_manager_->GetService(pending_psm)->NotifyChannelCreation(std::move(channel));
-  SendConfigurationRequest(remote_cid, {});
   alarm_.Cancel();
-  handle_send_next_command();
+  SendConfigurationRequest(remote_cid, {});
 }
 
 void ClassicSignallingManager::OnConfigurationRequest(SignalId signal_id, Cid cid, Continuation is_continuation,
@@ -180,15 +189,41 @@ void ClassicSignallingManager::OnConfigurationRequest(SignalId signal_id, Cid ci
     LOG_WARN("Configuration request for an unknown channel");
     return;
   }
-  auto response = ConfigurationResponseBuilder::Create(signal_id.Value(), cid, is_continuation,
+  auto response = ConfigurationResponseBuilder::Create(signal_id.Value(), channel->GetRemoteCid(), is_continuation,
                                                        ConfigurationResponseResult::SUCCESS, {});
   enqueue_buffer_->Enqueue(std::move(response), handler_);
-  handle_send_next_command();
+  channel->SetIncomingConfigurationStatus(DynamicChannelImpl::ConfigurationStatus::CONFIGURED);
+  if (channel->GetOutgoingConfigurationStatus() == DynamicChannelImpl::ConfigurationStatus::CONFIGURED) {
+    std::unique_ptr<DynamicChannel> user_channel = std::make_unique<DynamicChannel>(channel, handler_);
+    dynamic_service_manager_->GetService(channel->GetPsm())->NotifyChannelCreation(std::move(user_channel));
+  }
 }
 
 void ClassicSignallingManager::OnConfigurationResponse(SignalId signal_id, Cid cid, Continuation is_continuation,
                                                        ConfigurationResponseResult result,
-                                                       std::vector<std::unique_ptr<ConfigurationOption>> option) {}
+                                                       std::vector<std::unique_ptr<ConfigurationOption>> option) {
+  if (pending_commands_.empty()) {
+    LOG_WARN("Unexpected response: no pending request");
+    return;
+  }
+
+  auto last_sent_command = std::move(pending_commands_.front());
+  pending_commands_.pop();
+
+  auto channel = channel_allocator_->FindChannelByCid(cid);
+  if (channel == nullptr) {
+    LOG_WARN("Configuration request for an unknown channel");
+    handle_send_next_command();
+    return;
+  }
+  channel->SetOutgoingConfigurationStatus(DynamicChannelImpl::ConfigurationStatus::CONFIGURED);
+  if (channel->GetIncomingConfigurationStatus() == DynamicChannelImpl::ConfigurationStatus::CONFIGURED) {
+    std::unique_ptr<DynamicChannel> user_channel = std::make_unique<DynamicChannel>(channel, handler_);
+    dynamic_service_manager_->GetService(channel->GetPsm())->NotifyChannelCreation(std::move(user_channel));
+  }
+  alarm_.Cancel();
+  handle_send_next_command();
+}
 
 void ClassicSignallingManager::OnDisconnectionRequest(SignalId signal_id, Cid cid, Cid remote_cid) {
   // TODO: check cid match
@@ -197,26 +232,37 @@ void ClassicSignallingManager::OnDisconnectionRequest(SignalId signal_id, Cid ci
     LOG_WARN("Disconnect request for an unknown channel");
     return;
   }
-  auto builder = DisconnectionResponseBuilder::Create(signal_id.Value(), remote_cid, cid);
+  auto builder = DisconnectionResponseBuilder::Create(signal_id.Value(), cid, remote_cid);
   enqueue_buffer_->Enqueue(std::move(builder), handler_);
   channel->OnClosed(hci::ErrorCode::SUCCESS);
   link_->FreeDynamicChannel(cid);
+  handle_send_next_command();
 }
 
-void ClassicSignallingManager::OnDisconnectionResponse(SignalId signal_id, Cid cid, Cid remote_cid) {
-  if (last_sent_command_.signal_id_ != signal_id ||
-      last_sent_command_.command_code_ != CommandCode::DISCONNECTION_REQUEST) {
+void ClassicSignallingManager::OnDisconnectionResponse(SignalId signal_id, Cid remote_cid, Cid cid) {
+  if (pending_commands_.empty()) {
+    LOG_WARN("Unexpected response: no pending request");
+    return;
+  }
+  auto last_sent_command = std::move(pending_commands_.front());
+  pending_commands_.pop();
+  alarm_.Cancel();
+
+  if (last_sent_command.signal_id_ != signal_id ||
+      last_sent_command.command_code_ != CommandCode::DISCONNECTION_REQUEST) {
     return;
   }
 
   auto channel = channel_allocator_->FindChannelByCid(cid);
   if (channel == nullptr) {
     LOG_WARN("Disconnect response for an unknown channel");
+    handle_send_next_command();
     return;
   }
 
   channel->OnClosed(hci::ErrorCode::SUCCESS);
   link_->FreeDynamicChannel(cid);
+  handle_send_next_command();
 }
 
 void ClassicSignallingManager::OnEchoRequest(SignalId signal_id, const PacketView<kLittleEndian>& packet) {
@@ -225,13 +271,23 @@ void ClassicSignallingManager::OnEchoRequest(SignalId signal_id, const PacketVie
   raw_builder->AddOctets(packet_vector);
   auto builder = EchoResponseBuilder::Create(signal_id.Value(), std::move(raw_builder));
   enqueue_buffer_->Enqueue(std::move(builder), handler_);
+  handle_send_next_command();
 }
 
 void ClassicSignallingManager::OnEchoResponse(SignalId signal_id, const PacketView<kLittleEndian>& packet) {
-  if (last_sent_command_.signal_id_ != signal_id || last_sent_command_.command_code_ != CommandCode::ECHO_REQUEST) {
+  if (pending_commands_.empty()) {
+    LOG_WARN("Unexpected response: no pending request");
+    return;
+  }
+  auto last_sent_command = std::move(pending_commands_.front());
+  pending_commands_.pop();
+
+  if (last_sent_command.signal_id_ != signal_id || last_sent_command.command_code_ != CommandCode::ECHO_REQUEST) {
     return;
   }
   LOG_INFO("Echo response received");
+  alarm_.Cancel();
+  handle_send_next_command();
 }
 
 void ClassicSignallingManager::OnInformationRequest(SignalId signal_id, InformationRequestInfoType type) {
@@ -240,32 +296,39 @@ void ClassicSignallingManager::OnInformationRequest(SignalId signal_id, Informat
       auto response = InformationResponseConnectionlessMtuBuilder::Create(signal_id.Value(),
                                                                           InformationRequestResult::NOT_SUPPORTED, 0);
       enqueue_buffer_->Enqueue(std::move(response), handler_);
-      return;
+      break;
     }
     case InformationRequestInfoType::EXTENDED_FEATURES_SUPPORTED: {
       // TODO: implement this response
       auto response = InformationResponseExtendedFeaturesBuilder::Create(
           signal_id.Value(), InformationRequestResult::NOT_SUPPORTED, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
       enqueue_buffer_->Enqueue(std::move(response), handler_);
-      return;
+      break;
     }
     case InformationRequestInfoType::FIXED_CHANNELS_SUPPORTED: {
       auto response = InformationResponseFixedChannelsBuilder::Create(
           signal_id.Value(), InformationRequestResult::SUCCESS, fixed_service_manager_->GetSupportedFixedChannelMask());
       enqueue_buffer_->Enqueue(std::move(response), handler_);
-      return;
+      break;
     }
   }
 }
 
 void ClassicSignallingManager::OnInformationResponse(SignalId signal_id, const InformationResponseView& view) {
-  if (last_sent_command_.signal_id_ != signal_id ||
-      last_sent_command_.command_code_ != CommandCode::INFORMATION_REQUEST) {
+  if (pending_commands_.empty()) {
+    LOG_WARN("Unexpected response: no pending request");
     return;
   }
-  if (view.GetResult() != InformationRequestResult::SUCCESS) {
+  auto last_sent_command = std::move(pending_commands_.front());
+  pending_commands_.pop();
+
+  if (last_sent_command.signal_id_ != signal_id ||
+      last_sent_command.command_code_ != CommandCode::INFORMATION_REQUEST) {
     return;
   }
+  // TODO (hsz): Store the information response
+  alarm_.Cancel();
+  handle_send_next_command();
 }
 
 void ClassicSignallingManager::on_incoming_packet() {
@@ -321,6 +384,7 @@ void ClassicSignallingManager::on_incoming_packet() {
       OnConfigurationResponse(configuration_response_view.GetIdentifier(), configuration_response_view.GetSourceCid(),
                               configuration_response_view.GetContinuation(), configuration_response_view.GetResult(),
                               configuration_response_view.GetConfig());
+      return;
     }
     case CommandCode::DISCONNECTION_REQUEST: {
       DisconnectionRequestView disconnection_request_view = DisconnectionRequestView::Create(control_packet_view);
@@ -375,6 +439,8 @@ void ClassicSignallingManager::on_incoming_packet() {
     }
     default:
       LOG_WARN("Unhandled event 0x%x", static_cast<int>(code));
+      auto builder = CommandRejectNotUnderstoodBuilder::Create(control_packet_view.GetIdentifier());
+      enqueue_buffer_->Enqueue(std::move(builder), handler_);
       return;
   }
 }
@@ -382,29 +448,43 @@ void ClassicSignallingManager::on_incoming_packet() {
 void ClassicSignallingManager::send_connection_response(SignalId signal_id, Cid remote_cid, Cid local_cid,
                                                         ConnectionResponseResult result,
                                                         ConnectionResponseStatus status) {
-  auto builder = ConnectionResponseBuilder::Create(signal_id.Value(), remote_cid, local_cid, result, status);
+  auto builder = ConnectionResponseBuilder::Create(signal_id.Value(), local_cid, remote_cid, result, status);
   enqueue_buffer_->Enqueue(std::move(builder), handler_);
 }
 
 void ClassicSignallingManager::on_command_timeout() {
   LOG_WARN("Response time out");
-  link_->OnAclDisconnected(hci::ErrorCode::SUCCESS);
+  if (pending_commands_.empty()) {
+    LOG_ERROR("No pending command");
+    return;
+  }
+
+  auto last_sent_command = std::move(pending_commands_.front());
+  pending_commands_.pop();
+  switch (last_sent_command.command_code_) {
+    case CommandCode::CONFIGURATION_REQUEST: {
+      SendDisconnectionRequest(last_sent_command.source_cid_, last_sent_command.destination_cid_);
+      break;
+    }
+    default:
+      break;
+  }
+  handle_send_next_command();
 }
 
 void ClassicSignallingManager::handle_send_next_command() {
   if (pending_commands_.empty()) {
     return;
   }
-  last_sent_command_ = std::move(pending_commands_.front());
-  pending_commands_.pop();
+  auto& last_sent_command = pending_commands_.front();
 
-  auto signal_id = last_sent_command_.signal_id_;
-  auto psm = last_sent_command_.psm_;
-  auto source_cid = last_sent_command_.source_cid_;
-  auto destination_cid = last_sent_command_.destination_cid_;
-  auto info_type = last_sent_command_.info_type_;
-  auto config = std::move(last_sent_command_.config_);
-  switch (last_sent_command_.command_code_) {
+  auto signal_id = last_sent_command.signal_id_;
+  auto psm = last_sent_command.psm_;
+  auto source_cid = last_sent_command.source_cid_;
+  auto destination_cid = last_sent_command.destination_cid_;
+  auto info_type = last_sent_command.info_type_;
+  auto config = std::move(last_sent_command.config_);
+  switch (last_sent_command.command_code_) {
     case CommandCode::CONNECTION_REQUEST: {
       auto builder = ConnectionRequestBuilder::Create(signal_id.Value(), psm, source_cid);
       enqueue_buffer_->Enqueue(std::move(builder), handler_);
@@ -435,7 +515,7 @@ void ClassicSignallingManager::handle_send_next_command() {
       break;
     }
     default:
-      LOG_WARN("Unsupported command code 0x%x", static_cast<int>(last_sent_command_.command_code_));
+      LOG_WARN("Unsupported command code 0x%x", static_cast<int>(last_sent_command.command_code_));
   }
 }
 

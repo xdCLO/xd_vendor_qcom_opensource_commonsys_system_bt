@@ -19,6 +19,7 @@
 #include <functional>
 #include <future>
 #include <map>
+#include <string>
 #include <vector>
 
 #include "common/bind.h"
@@ -27,8 +28,6 @@
 #include "os/thread.h"
 
 namespace bluetooth {
-
-const std::chrono::milliseconds kModuleStopTimeout = std::chrono::milliseconds(20);
 
 class Module;
 class ModuleRegistry;
@@ -76,6 +75,8 @@ class Module {
 
   // Release all resources, you're about to be deleted
   virtual void Stop() = 0;
+
+  virtual std::string ToString() const;
 
   ::bluetooth::os::Handler* GetHandler() const;
 
