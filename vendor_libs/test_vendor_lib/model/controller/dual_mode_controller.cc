@@ -67,7 +67,8 @@ std::string DualModeController::GetTypeString() const {
   return "Simulated Bluetooth Controller";
 }
 
-void DualModeController::IncomingPacket(packets::LinkLayerPacketView incoming) {
+void DualModeController::IncomingPacket(
+    model::packets::LinkLayerPacketView incoming) {
   link_layer_controller_.IncomingPacket(incoming);
 }
 
@@ -111,7 +112,8 @@ DualModeController::DualModeController(const std::string& properties_filename, u
   properties_.SetAddress(public_address);
 
   link_layer_controller_.RegisterRemoteChannel(
-      [this](std::shared_ptr<packets::LinkLayerPacketBuilder> packet, Phy::Type phy_type) {
+      [this](std::shared_ptr<model::packets::LinkLayerPacketBuilder> packet,
+             Phy::Type phy_type) {
         DualModeController::SendLinkLayerPacket(packet, phy_type);
       });
 
@@ -121,6 +123,7 @@ DualModeController::DualModeController(const std::string& properties_filename, u
   SET_HANDLER(OpCode::READ_BUFFER_SIZE, HciReadBufferSize);
   SET_HANDLER(OpCode::HOST_BUFFER_SIZE, HciHostBufferSize);
   SET_HANDLER(OpCode::SNIFF_SUBRATING, HciSniffSubrating);
+  SET_HANDLER(OpCode::READ_ENCRYPTION_KEY_SIZE, HciReadEncryptionKeySize);
   SET_HANDLER(OpCode::READ_LOCAL_VERSION_INFORMATION, HciReadLocalVersionInformation);
   SET_HANDLER(OpCode::READ_BD_ADDR, HciReadBdAddr);
   SET_HANDLER(OpCode::READ_LOCAL_SUPPORTED_COMMANDS, HciReadLocalSupportedCommands);
@@ -137,6 +140,8 @@ DualModeController::DualModeController(const std::string& properties_filename, u
   SET_HANDLER(OpCode::IO_CAPABILITY_REQUEST_NEGATIVE_REPLY, HciIoCapabilityRequestNegativeReply);
   SET_HANDLER(OpCode::WRITE_SIMPLE_PAIRING_MODE, HciWriteSimplePairingMode);
   SET_HANDLER(OpCode::WRITE_LE_HOST_SUPPORT, HciWriteLeHostSupport);
+  SET_HANDLER(OpCode::WRITE_SECURE_CONNECTIONS_HOST_SUPPORT,
+              HciWriteSecureConnectionHostSupport);
   SET_HANDLER(OpCode::SET_EVENT_MASK, HciSetEventMask);
   SET_HANDLER(OpCode::WRITE_INQUIRY_MODE, HciWriteInquiryMode);
   SET_HANDLER(OpCode::WRITE_PAGE_SCAN_TYPE, HciWritePageScanType);
@@ -204,6 +209,12 @@ DualModeController::DualModeController(const std::string& properties_filename, u
   SET_HANDLER(OpCode::READ_REMOTE_VERSION_INFORMATION, HciReadRemoteVersionInformation);
   SET_HANDLER(OpCode::LE_CONNECTION_UPDATE, HciLeConnectionUpdate);
   SET_HANDLER(OpCode::LE_START_ENCRYPTION, HciLeStartEncryption);
+  SET_HANDLER(OpCode::LE_ADD_DEVICE_TO_RESOLVING_LIST,
+              HciLeAddDeviceToResolvingList);
+  SET_HANDLER(OpCode::LE_REMOVE_DEVICE_FROM_RESOLVING_LIST,
+              HciLeRemoveDeviceFromResolvingList);
+  SET_HANDLER(OpCode::LE_CLEAR_RESOLVING_LIST, HciLeClearResolvingList);
+  SET_HANDLER(OpCode::LE_SET_PRIVACY_MODE, HciLeSetPrivacyMode);
   // Testing Commands
   SET_HANDLER(OpCode::READ_LOOPBACK_MODE, HciReadLoopbackMode);
   SET_HANDLER(OpCode::WRITE_LOOPBACK_MODE, HciWriteLoopbackMode);
@@ -308,6 +319,19 @@ void DualModeController::HciReadBufferSize(packets::PacketView<true> args) {
       packets::EventPacketBuilder::CreateCommandCompleteReadBufferSize(
           hci::Status::SUCCESS, properties_.GetAclDataPacketSize(), properties_.GetSynchronousDataPacketSize(),
           properties_.GetTotalNumAclDataPackets(), properties_.GetTotalNumSynchronousDataPackets());
+
+  send_event_(command_complete->ToVector());
+}
+
+void DualModeController::HciReadEncryptionKeySize(
+    packets::PacketView<true> args) {
+  ASSERT_LOG(args.size() == 2, "%s  size=%zu", __func__, args.size());
+
+  uint16_t handle = args.begin().extract<uint16_t>();
+
+  std::shared_ptr<packets::EventPacketBuilder> command_complete =
+      packets::EventPacketBuilder::CreateCommandCompleteReadEncryptionKeySize(
+          hci::Status::SUCCESS, handle, properties_.GetEncryptionKeySize());
 
   send_event_(command_complete->ToVector());
 }
@@ -538,6 +562,12 @@ void DualModeController::HciChangeConnectionPacketType(packets::PacketView<true>
 void DualModeController::HciWriteLeHostSupport(packets::PacketView<true> args) {
   ASSERT_LOG(args.size() == 2, "%s  size=%zu", __func__, args.size());
   SendCommandCompleteSuccess(OpCode::WRITE_LE_HOST_SUPPORT);
+}
+
+void DualModeController::HciWriteSecureConnectionHostSupport(
+    packets::PacketView<true> args) {
+  ASSERT_LOG(args.size() == 1, "%s  size=%zu", __func__, args.size());
+  SendCommandCompleteSuccess(OpCode::WRITE_SECURE_CONNECTIONS_HOST_SUPPORT);
 }
 
 void DualModeController::HciSetEventMask(packets::PacketView<true> args) {
@@ -1061,6 +1091,70 @@ void DualModeController::HciLeRemoveDeviceFromWhiteList(packets::PacketView<true
   SendCommandCompleteSuccess(OpCode::LE_REMOVE_DEVICE_FROM_WHITE_LIST);
 }
 
+void DualModeController::HciLeClearResolvingList(
+    packets::PacketView<true> args) {
+  ASSERT_LOG(args.size() == 0, "%s  size=%zu", __func__, args.size());
+  link_layer_controller_.LeResolvingListClear();
+  SendCommandCompleteSuccess(OpCode::LE_CLEAR_RESOLVING_LIST);
+}
+
+void DualModeController::HciLeAddDeviceToResolvingList(
+    packets::PacketView<true> args) {
+  ASSERT_LOG(args.size() == 39, "%s  size=%zu", __func__, args.size());
+
+  if (link_layer_controller_.LeResolvingListFull()) {
+    SendCommandCompleteOnlyStatus(OpCode::LE_ADD_DEVICE_TO_RESOLVING_LIST,
+                                  hci::Status::MEMORY_CAPACITY_EXCEEDED);
+    return;
+  }
+  auto args_itr = args.begin();
+  uint8_t addr_type = args_itr.extract<uint8_t>();
+  Address address = args_itr.extract<Address>();
+  std::array<uint8_t, LinkLayerController::kIrk_size> peerIrk;
+  std::array<uint8_t, LinkLayerController::kIrk_size> localIrk;
+  for (size_t irk_ind = 0; irk_ind < LinkLayerController::kIrk_size;
+       irk_ind++) {
+    peerIrk[irk_ind] = args_itr.extract<uint8_t>();
+  }
+
+  for (size_t irk_ind = 0; irk_ind < LinkLayerController::kIrk_size;
+       irk_ind++) {
+    localIrk[irk_ind] = args_itr.extract<uint8_t>();
+  }
+
+  link_layer_controller_.LeResolvingListAddDevice(address, addr_type, peerIrk,
+                                                  localIrk);
+  SendCommandCompleteSuccess(OpCode::LE_ADD_DEVICE_TO_RESOLVING_LIST);
+}
+
+void DualModeController::HciLeRemoveDeviceFromResolvingList(
+    packets::PacketView<true> args) {
+  ASSERT_LOG(args.size() == 7, "%s  size=%zu", __func__, args.size());
+
+  auto args_itr = args.begin();
+  uint8_t addr_type = args_itr.extract<uint8_t>();
+  Address address = args_itr.extract<Address>();
+  link_layer_controller_.LeResolvingListRemoveDevice(address, addr_type);
+  SendCommandCompleteSuccess(OpCode::LE_REMOVE_DEVICE_FROM_RESOLVING_LIST);
+}
+
+void DualModeController::HciLeSetPrivacyMode(packets::PacketView<true> args) {
+  ASSERT_LOG(args.size() == 8, "%s  size=%zu", __func__, args.size());
+
+  auto args_itr = args.begin();
+  uint8_t peer_identity_address_type = args_itr.extract<uint8_t>();
+  Address peer_identity_address = args_itr.extract<Address>();
+  uint8_t privacy_mode = args_itr.extract<uint8_t>();
+
+  if (link_layer_controller_.LeResolvingListContainsDevice(
+          peer_identity_address, peer_identity_address_type)) {
+    link_layer_controller_.LeSetPrivacyMode(
+        peer_identity_address_type, peer_identity_address, privacy_mode);
+  }
+
+  SendCommandCompleteSuccess(OpCode::LE_SET_PRIVACY_MODE);
+}
+
 /*
 void DualModeController::HciLeReadRemoteUsedFeaturesRsp(uint16_t handle,
                                                         uint64_t features) {
@@ -1223,6 +1317,10 @@ void DualModeController::HciWriteLoopbackMode(packets::PacketView<true> args) {
                   hci::Status::SUCCESS, sco_handle, properties_.GetAddress(), hci::LinkType::SCO, false)
                   ->ToVector());
   SendCommandCompleteSuccess(OpCode::WRITE_LOOPBACK_MODE);
+}
+
+void DualModeController::SetAddress(Address address) {
+  properties_.SetAddress(address);
 }
 
 }  // namespace test_vendor_lib
