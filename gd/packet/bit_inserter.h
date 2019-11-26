@@ -29,15 +29,13 @@ namespace packet {
 class BitInserter : public ByteInserter {
  public:
   BitInserter(std::vector<uint8_t>& vector);
-  virtual ~BitInserter();
+  ~BitInserter() override;
 
-  void insert_bits(uint8_t byte, size_t num_bits);
+  virtual void insert_bits(uint8_t byte, size_t num_bits);
 
-  void insert_byte(uint8_t byte);
+  void insert_byte(uint8_t byte) override;
 
-  bool IsByteAligned();
-
- private:
+ protected:
   size_t num_saved_bits_{0};
   uint8_t saved_bits_{0};
 };

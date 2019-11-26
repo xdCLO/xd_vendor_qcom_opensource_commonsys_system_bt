@@ -131,8 +131,10 @@ void TestModel::AddDeviceToPhy(size_t dev_index, size_t phy_index) {
     return;
   }
   auto dev = device->second;
-  dev->RegisterPhyLayer(
-      phy->second->GetPhyLayer([dev](packets::LinkLayerPacketView packet) { dev->IncomingPacket(packet); }));
+  dev->RegisterPhyLayer(phy->second->GetPhyLayer(
+      [dev](model::packets::LinkLayerPacketView packet) {
+        dev->IncomingPacket(packet);
+      }));
 }
 
 void TestModel::DelDeviceFromPhy(size_t dev_index, size_t phy_index) {
@@ -200,6 +202,15 @@ void TestModel::OnHciConnectionClosed(int socket_fd, size_t index) {
   ASSERT_LOG(close_result == 0, "can't close: %s", strerror(errno));
   device->second->UnregisterPhyLayers();
   devices_.erase(index);
+}
+
+void TestModel::SetDeviceAddress(size_t index, Address address) {
+  auto device = devices_.find(index);
+  if (device == devices_.end()) {
+    LOG_WARN("SetDeviceAddress can't find device!");
+    return;
+  }
+  device->second->SetAddress(address);
 }
 
 const std::string& TestModel::List() {

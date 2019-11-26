@@ -45,10 +45,19 @@ bool ParseUint16t(base::StringPiece value, uint16_t* field) {
 namespace test_vendor_lib {
 
 DeviceProperties::DeviceProperties(const std::string& file_name)
-    : acl_data_packet_size_(1024), sco_data_packet_size_(255), num_acl_data_packets_(10), num_sco_data_packets_(10),
-      version_(static_cast<uint8_t>(hci::Version::V4_1)), revision_(0),
-      lmp_pal_version_(static_cast<uint8_t>(hci::Version::V4_1)), manufacturer_name_(0), lmp_pal_subversion_(0),
-      le_data_packet_length_(27), num_le_data_packets_(15), le_white_list_size_(15) {
+    : acl_data_packet_size_(1024),
+      sco_data_packet_size_(255),
+      num_acl_data_packets_(10),
+      num_sco_data_packets_(10),
+      version_(static_cast<uint8_t>(hci::Version::V4_1)),
+      revision_(0),
+      lmp_pal_version_(static_cast<uint8_t>(hci::Version::V4_1)),
+      manufacturer_name_(0),
+      lmp_pal_subversion_(0),
+      le_data_packet_length_(27),
+      num_le_data_packets_(15),
+      le_white_list_size_(15),
+      le_resolving_list_size_(15) {
   std::string properties_raw;
 
   ASSERT(Address::FromString("BB:BB:BB:BB:BB:AD", address_));
@@ -97,6 +106,7 @@ void DeviceProperties::RegisterJSONConverter(base::JSONValueConverter<DeviceProp
   converter->RegisterCustomField<uint16_t>(field_name, &DeviceProperties::field, &ParseUint16t);
   REGISTER_UINT16_T("AclDataPacketSize", acl_data_packet_size_);
   REGISTER_UINT8_T("ScoDataPacketSize", sco_data_packet_size_);
+  REGISTER_UINT8_T("EncryptionKeySize", encryption_key_size_);
   REGISTER_UINT16_T("NumAclDataPackets", num_acl_data_packets_);
   REGISTER_UINT16_T("NumScoDataPackets", num_sco_data_packets_);
   REGISTER_UINT8_T("Version", version_);
