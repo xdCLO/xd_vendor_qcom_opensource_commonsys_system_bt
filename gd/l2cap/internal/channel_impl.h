@@ -23,6 +23,7 @@
 namespace bluetooth {
 namespace l2cap {
 namespace internal {
+class Sender;
 
 /**
  * Common interface for internal channel implementation
@@ -38,7 +39,7 @@ class ChannelImpl {
   GetQueueUpEnd() = 0;
 
   /**
-   * Return the queue end for lower layer (segmenter and reassembler)
+   * Return the queue end for lower layer (sender and receiver)
    */
   virtual common::BidiQueueEnd<packet::PacketView<packet::kLittleEndian>, packet::BasePacketBuilder>*
   GetQueueDownEnd() = 0;
@@ -46,17 +47,6 @@ class ChannelImpl {
   virtual Cid GetCid() const = 0;
 
   virtual Cid GetRemoteCid() const = 0;
-
-  /**
-   * Return one of the supported channel mode as defined above
-   */
-  virtual RetransmissionAndFlowControlModeOption GetChannelMode() const = 0;
-
-  /**
-   * Invoked by the command signalling manager to update the channel mode. Does NOT apply to fixed channel, OR LE
-   * credit-based flow control channel
-   */
-  virtual void SetChannelMode(RetransmissionAndFlowControlModeOption) = 0;
 };
 
 }  // namespace internal

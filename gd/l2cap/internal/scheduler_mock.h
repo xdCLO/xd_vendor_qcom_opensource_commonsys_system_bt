@@ -28,9 +28,7 @@ namespace testing {
 
 class MockScheduler : public Scheduler {
  public:
-  MOCK_METHOD(void, AttachChannel, (Cid cid, std::shared_ptr<l2cap::internal::ChannelImpl> channel), (override));
-  MOCK_METHOD(void, DetachChannel, (Cid cid), (override));
-  MOCK_METHOD(void, NotifyPacketsReady, (Cid cid, int number_packet), (override));
+  MOCK_METHOD(void, OnPacketsReady, (Cid cid, int number_packet), (override));
 };
 
 }  // namespace testing

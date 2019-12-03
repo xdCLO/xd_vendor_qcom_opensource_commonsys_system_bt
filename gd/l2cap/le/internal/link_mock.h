@@ -16,7 +16,7 @@
 #pragma once
 
 #include "hci/acl_manager_mock.h"
-#include "hci/address.h"
+#include "hci/address_with_type.h"
 #include "l2cap/internal/scheduler_mock.h"
 #include "l2cap/le/internal/link.h"
 
@@ -34,8 +34,7 @@ using hci::testing::MockAclConnection;
 class MockLink : public Link {
  public:
   explicit MockLink(os::Handler* handler, l2cap::internal::ParameterProvider* parameter_provider)
-      : Link(handler, std::make_unique<MockAclConnection>(),
-             std::make_unique<l2cap::internal::testing::MockScheduler>(), parameter_provider){};
+      : Link(handler, std::make_unique<MockAclConnection>(), parameter_provider){};
   MOCK_METHOD(hci::AddressWithType, GetDevice, (), (override));
   MOCK_METHOD(hci::Role, GetRole, (), (override));
   MOCK_METHOD(void, OnAclDisconnected, (hci::ErrorCode status), (override));
