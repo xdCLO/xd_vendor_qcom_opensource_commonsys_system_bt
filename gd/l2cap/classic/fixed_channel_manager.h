@@ -31,6 +31,10 @@ namespace classic {
 
 class L2capClassicModule;
 
+namespace testing {
+class MockFixedChannelManager;
+}
+
 namespace internal {
 class LinkManager;
 class FixedChannelServiceManagerImpl;
@@ -102,7 +106,7 @@ class FixedChannelManager {
    *
    * Returns: true if connection was able to be initiated, false otherwise.
    */
-  bool ConnectServices(hci::Address device, OnConnectionFailureCallback on_fail_callback, os::Handler* handler);
+  virtual bool ConnectServices(hci::Address device, OnConnectionFailureCallback on_fail_callback, os::Handler* handler);
 
   /**
    * Register a service to receive incoming connections bound to a specific channel.
@@ -124,17 +128,21 @@ class FixedChannelManager {
    * @param on_open_callback: A callback to indicate success of a connection initiated from a remote device.
    * @param handler: The handler context in which to execute the @callback parameter.
    */
-  bool RegisterService(Cid cid, const SecurityPolicy& security_policy,
-                       OnRegistrationCompleteCallback on_registration_complete,
-                       OnConnectionOpenCallback on_connection_open, os::Handler* handler);
+  virtual bool RegisterService(Cid cid, const SecurityPolicy& security_policy,
+                               OnRegistrationCompleteCallback on_registration_complete,
+                               OnConnectionOpenCallback on_connection_open, os::Handler* handler);
+
+  virtual ~FixedChannelManager() = default;
 
   friend class L2capClassicModule;
+  friend class testing::MockFixedChannelManager;
 
  private:
   // The constructor is not to be used by user code
   FixedChannelManager(internal::FixedChannelServiceManagerImpl* service_manager, internal::LinkManager* link_manager,
                       os::Handler* l2cap_layer_handler)
       : service_manager_(service_manager), link_manager_(link_manager), l2cap_layer_handler_(l2cap_layer_handler) {}
+
   internal::FixedChannelServiceManagerImpl* service_manager_ = nullptr;
   internal::LinkManager* link_manager_ = nullptr;
   os::Handler* l2cap_layer_handler_ = nullptr;

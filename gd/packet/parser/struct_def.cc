@@ -180,6 +180,35 @@ void StructDef::GenDefinition(std::ostream& s) const {
   s << "\n";
 }
 
+void StructDef::GenDefinitionPybind11(std::ostream& s) const {
+  s << "py::class_<" << name_;
+  if (parent_ != nullptr) {
+    s << ", " << parent_->name_;
+  } else {
+    if (is_little_endian_) {
+      s << ", PacketStruct<kLittleEndian>";
+    } else {
+      s << ", PacketStruct<!kLittleEndian>";
+    }
+  }
+  s << ">(m, \"" << name_ << "\")";
+  s << ".def(py::init<>())";
+  s << ".def(\"Serialize\", [](" << GetTypeName() << "& obj){";
+  s << "std::vector<uint8_t> bytes;";
+  s << "BitInserter bi(bytes);";
+  s << "obj.Serialize(bi);";
+  s << "return bytes;})";
+  s << ".def(\"Parse\", &" << name_ << "::Parse)";
+  s << ".def(\"size\", &" << name_ << "::size)";
+  for (const auto& field : fields_) {
+    if (field->GetBuilderParameterType().empty()) {
+      continue;
+    }
+    s << ".def_readwrite(\"" << field->GetName() << "\", &" << name_ << "::" << field->GetName() << "_)";
+  }
+  s << ";\n";
+}
+
 void StructDef::GenConstructor(std::ostream& s) const {
   if (parent_ != nullptr) {
     s << name_ << "(const " << parent_->name_ << "& parent) : " << parent_->name_ << "(parent) {}";

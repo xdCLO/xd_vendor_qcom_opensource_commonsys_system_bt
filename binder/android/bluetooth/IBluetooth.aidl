@@ -143,9 +143,6 @@ interface IBluetooth
     int getSimAccessPermission(in BluetoothDevice device);
     boolean setSimAccessPermission(in BluetoothDevice device, int value);
 
-    @UnsupportedAppUsage
-    void sendConnectionStateChange(in BluetoothDevice device, int profile, int state, int prevState);
-
     void registerCallback(in IBluetoothCallback callback);
     void unregisterCallback(in IBluetoothCallback callback);
 
@@ -186,4 +183,7 @@ interface IBluetooth
     void onBrEdrDown();
     int setSocketOpt(int type, int port, int optionName, in byte [] optionVal, int optionLen);
     int getSocketOpt(int type, int port, int optionName, out byte [] optionVal);
+
+    boolean connectAllEnabledProfiles(in BluetoothDevice device);
+    boolean disconnectAllEnabledProfiles(in BluetoothDevice device);
 }

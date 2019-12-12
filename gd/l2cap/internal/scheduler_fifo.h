@@ -24,30 +24,28 @@
 #include "l2cap/cid.h"
 #include "l2cap/internal/channel_impl.h"
 #include "l2cap/internal/scheduler.h"
-#include "l2cap/internal/segmenter.h"
+#include "l2cap/internal/sender.h"
 #include "os/handler.h"
 #include "os/queue.h"
 
 namespace bluetooth {
 namespace l2cap {
-
 namespace internal {
+class DataPipelineManager;
 
 class Fifo : public Scheduler {
  public:
-  Fifo(LowerQueueUpEnd* link_queue_up_end, os::Handler* handler);
+  Fifo(DataPipelineManager* data_pipeline_manager, LowerQueueUpEnd* link_queue_up_end, os::Handler* handler);
   ~Fifo() override;
-  void AttachChannel(Cid cid, std::shared_ptr<ChannelImpl> channel) override;
-  void DetachChannel(Cid cid) override;
-  void NotifyPacketsReady(Cid cid, int number_packets) override;
+  void OnPacketsReady(Cid cid, int number_packets) override;
 
  private:
+  DataPipelineManager* data_pipeline_manager_;
   LowerQueueUpEnd* link_queue_up_end_;
   os::Handler* handler_;
-  std::unordered_map<Cid, Segmenter> segmenter_map_;
   std::queue<std::pair<Cid, int>> next_to_dequeue_and_num_packets;
-
   bool link_queue_enqueue_registered_ = false;
+
   void try_register_link_queue_enqueue();
   std::unique_ptr<LowerEnqueue> link_queue_enqueue_callback();
 };

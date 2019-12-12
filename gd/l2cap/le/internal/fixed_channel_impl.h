@@ -55,9 +55,6 @@ class FixedChannelImpl : public l2cap::internal::ChannelImpl {
 
   Cid GetCid() const override;
   Cid GetRemoteCid() const override;
-  RetransmissionAndFlowControlModeOption GetChannelMode() const override;
-  void SetChannelMode(RetransmissionAndFlowControlModeOption option) override;
-
   virtual void OnClosed(hci::ErrorCode status);
 
   virtual std::string ToString() {

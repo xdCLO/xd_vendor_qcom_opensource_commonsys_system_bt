@@ -590,7 +590,7 @@ struct Controller::impl {
       OP_CODE_MAPPING(LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH)
       OP_CODE_MAPPING(LE_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH)
       OP_CODE_MAPPING(LE_READ_LOCAL_P_256_PUBLIC_KEY_COMMAND)
-      OP_CODE_MAPPING(LE_GENERATE_DHKEY_COMMAND)
+      OP_CODE_MAPPING(LE_GENERATE_DHKEY_COMMAND_V1)
       OP_CODE_MAPPING(LE_ADD_DEVICE_TO_RESOLVING_LIST)
       OP_CODE_MAPPING(LE_REMOVE_DEVICE_FROM_RESOLVING_LIST)
       OP_CODE_MAPPING(LE_CLEAR_RESOLVING_LIST)
@@ -631,6 +631,7 @@ struct Controller::impl {
       OP_CODE_MAPPING(LE_READ_RF_PATH_COMPENSATION_POWER)
       OP_CODE_MAPPING(LE_WRITE_RF_PATH_COMPENSATION_POWER)
       OP_CODE_MAPPING(LE_SET_PRIVACY_MODE)
+      OP_CODE_MAPPING(LE_GENERATE_DHKEY_COMMAND)
       // vendor specific
       case OpCode::LE_GET_VENDOR_CAPABILITIES:
         return vendor_capabilities_.is_supported_ == 0x01;
@@ -650,6 +651,8 @@ struct Controller::impl {
         return vendor_capabilities_.debug_logging_supported_ == 0x01;
       case OpCode::CONTROLLER_A2DP_OPCODE:
         return vendor_capabilities_.a2dp_source_offload_capability_mask_ != 0x00;
+      case OpCode::CONTROLLER_BQR:
+        return vendor_capabilities_.bluetooth_quality_report_support_ == 0x01;
       // undefined in local_supported_commands_
       case OpCode::CREATE_NEW_UNIT_KEY:
       case OpCode::READ_LOCAL_SUPPORTED_COMMANDS:
