@@ -46,9 +46,9 @@ class Link : public l2cap::internal::ILink {
        DynamicChannelServiceManagerImpl* dynamic_service_manager,
        FixedChannelServiceManagerImpl* fixed_service_manager);
 
-  virtual ~Link() = default;
+  ~Link() override = default;
 
-  virtual hci::AddressWithType GetDevice() {
+  hci::AddressWithType GetDevice() override {
     return {acl_connection_->GetAddress(), acl_connection_->GetAddressType()};
   }
 
@@ -78,6 +78,9 @@ class Link : public l2cap::internal::ILink {
   virtual void SendConnectionRequest(Psm psm, Cid local_cid);
   virtual void SendConnectionRequest(Psm psm, Cid local_cid,
                                      PendingDynamicChannelConnection pending_dynamic_channel_connection);
+
+  // Invoked by signalling manager to indicate an outgoing connection request failed and link shall free resources
+  virtual void OnOutgoingConnectionRequestFail(Cid local_cid);
 
   virtual void SendInformationRequest(InformationRequestInfoType type);
 
@@ -111,6 +114,8 @@ class Link : public l2cap::internal::ILink {
     return GetDevice().ToString();
   }
 
+  void SendLeCredit(Cid local_cid, uint16_t credit) override {}
+
  private:
   os::Handler* l2cap_handler_;
   l2cap::internal::FixedChannelAllocator<FixedChannelImpl, Link> fixed_channel_allocator_{this, l2cap_handler_};
@@ -123,7 +128,7 @@ class Link : public l2cap::internal::ILink {
   ClassicSignallingManager signalling_manager_;
   std::unordered_map<Cid, PendingDynamicChannelConnection> local_cid_to_pending_dynamic_channel_connection_map_;
   os::Alarm link_idle_disconnect_alarm_{l2cap_handler_};
-  Mtu remote_mtu_ = kMinimumClassicMtu;
+  Mtu remote_connectionless_mtu_ = kMinimumClassicMtu;
   bool remote_supports_ertm_ = false;
   bool remote_supports_fcs_ = false;
   DISALLOW_COPY_AND_ASSIGN(Link);

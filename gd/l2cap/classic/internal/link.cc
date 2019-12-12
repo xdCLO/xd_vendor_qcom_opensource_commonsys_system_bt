@@ -57,7 +57,7 @@ void Link::Disconnect() {
 
 std::shared_ptr<FixedChannelImpl> Link::AllocateFixedChannel(Cid cid, SecurityPolicy security_policy) {
   auto channel = fixed_channel_allocator_.AllocateChannel(cid, security_policy);
-  data_pipeline_manager_.AttachChannel(cid, channel);
+  data_pipeline_manager_.AttachChannel(cid, channel, l2cap::internal::DataPipelineManager::ChannelMode::BASIC);
   return channel;
 }
 
@@ -79,6 +79,11 @@ void Link::SendConnectionRequest(Psm psm, Cid local_cid,
   signalling_manager_.SendConnectionRequest(psm, local_cid);
 }
 
+void Link::OnOutgoingConnectionRequestFail(Cid local_cid) {
+  local_cid_to_pending_dynamic_channel_connection_map_.erase(local_cid);
+  dynamic_channel_allocator_.FreeChannel(local_cid);
+}
+
 void Link::SendDisconnectionRequest(Cid local_cid, Cid remote_cid) {
   signalling_manager_.SendDisconnectionRequest(local_cid, remote_cid);
 }
@@ -91,7 +96,8 @@ std::shared_ptr<l2cap::internal::DynamicChannelImpl> Link::AllocateDynamicChanne
                                                                                   SecurityPolicy security_policy) {
   auto channel = dynamic_channel_allocator_.AllocateChannel(psm, remote_cid, security_policy);
   if (channel != nullptr) {
-    data_pipeline_manager_.AttachChannel(channel->GetCid(), channel);
+    data_pipeline_manager_.AttachChannel(channel->GetCid(), channel,
+                                         l2cap::internal::DataPipelineManager::ChannelMode::BASIC);
     RefreshRefCount();
   }
   channel->local_initiated_ = false;
@@ -102,7 +108,8 @@ std::shared_ptr<l2cap::internal::DynamicChannelImpl> Link::AllocateReservedDynam
     Cid reserved_cid, Psm psm, Cid remote_cid, SecurityPolicy security_policy) {
   auto channel = dynamic_channel_allocator_.AllocateReservedChannel(reserved_cid, psm, remote_cid, security_policy);
   if (channel != nullptr) {
-    data_pipeline_manager_.AttachChannel(channel->GetCid(), channel);
+    data_pipeline_manager_.AttachChannel(channel->GetCid(), channel,
+                                         l2cap::internal::DataPipelineManager::ChannelMode::BASIC);
     RefreshRefCount();
   }
   channel->local_initiated_ = true;
@@ -158,11 +165,11 @@ void Link::NotifyChannelFail(Cid cid) {
 }
 
 void Link::SetRemoteConnectionlessMtu(Mtu mtu) {
-  remote_mtu_ = mtu;
+  remote_connectionless_mtu_ = mtu;
 }
 
 Mtu Link::GetRemoteConnectionlessMtu() const {
-  return remote_mtu_;
+  return remote_connectionless_mtu_;
 }
 
 void Link::SetRemoteSupportsErtm(bool supported) {
