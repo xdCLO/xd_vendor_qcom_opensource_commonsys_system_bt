@@ -346,7 +346,8 @@ class BtifAvSource {
 
   bt_status_t Init(
       btav_source_callbacks_t* callbacks, int max_connected_audio_devices,
-      const std::vector<btav_a2dp_codec_config_t>& codec_priorities);
+      const std::vector<btav_a2dp_codec_config_t>& codec_priorities,
+      const std::vector<btav_a2dp_codec_config_t>& offloading_preference);
   void Cleanup();
 
   btav_source_callbacks_t* Callbacks() { return callbacks_; }
@@ -494,23 +495,12 @@ class BtifAvSource {
       const std::vector<btav_a2dp_codec_config_t>& codec_preferences,
       std::promise<void> peer_ready_promise) {
     // Restart the session if the codec for the active peer is updated
-    bool restart_session =
-        ((active_peer_ == peer_address) && !active_peer_.IsEmpty());
-    if (restart_session) {
+    if (!peer_address.IsEmpty() && active_peer_ == peer_address) {
       btif_a2dp_source_end_session(active_peer_);
     }
 
-    for (auto cp : codec_preferences) {
-      BTIF_TRACE_DEBUG("%s: codec_preference=%s", __func__,
-                       cp.ToString().c_str());
-      btif_a2dp_source_encoder_user_config_update_req(peer_address, cp);
-    }
-    if (restart_session) {
-      btif_a2dp_source_start_session(active_peer_,
-                                     std::move(peer_ready_promise));
-    } else {
-      peer_ready_promise.set_value();
-    }
+    btif_a2dp_source_encoder_user_config_update_req(
+        peer_address, codec_preferences, std::move(peer_ready_promise));
   }
 
   const std::map<RawAddress, BtifAvPeer*>& Peers() const { return peers_; }
@@ -946,7 +936,8 @@ BtifAvSource::~BtifAvSource() { CleanupAllPeers(); }
 
 bt_status_t BtifAvSource::Init(
     btav_source_callbacks_t* callbacks, int max_connected_audio_devices,
-    const std::vector<btav_a2dp_codec_config_t>& codec_priorities) {
+    const std::vector<btav_a2dp_codec_config_t>& codec_priorities,
+    const std::vector<btav_a2dp_codec_config_t>& offloading_preference) {
   LOG_INFO(LOG_TAG, "%s: max_connected_audio_devices=%d", __PRETTY_FUNCTION__,
            max_connected_audio_devices);
   if (enabled_) return BT_STATUS_SUCCESS;
@@ -964,6 +955,10 @@ bt_status_t BtifAvSource::Init(
   BTIF_TRACE_DEBUG("a2dp_offload.enable = %d", a2dp_offload_enabled_);
 
   callbacks_ = callbacks;
+  if (a2dp_offload_enabled_) {
+    bluetooth::audio::a2dp::update_codec_offloading_capabilities(
+        offloading_preference);
+  }
   bta_av_co_init(codec_priorities);
 
   if (!btif_a2dp_source_init()) {
@@ -1841,17 +1836,26 @@ bool BtifAvStateMachine::StateOpened::ProcessEvent(uint32_t event,
       // If remote tries to start A2DP when DUT is A2DP Source, then Suspend.
       // If A2DP is Sink and call is active, then disconnect the AVDTP channel.
       bool should_suspend = false;
-      if (peer_.IsSink() && !peer_.CheckFlags(BtifAvPeer::kFlagPendingStart |
-                                              BtifAvPeer::kFlagRemoteSuspend)) {
-        LOG(WARNING) << __PRETTY_FUNCTION__ << ": Peer " << peer_.PeerAddress()
-                     << " : trigger Suspend as remote initiated";
-        should_suspend = true;
-      }
+      if (peer_.IsSink()) {
+        if (!peer_.CheckFlags(BtifAvPeer::kFlagPendingStart |
+                              BtifAvPeer::kFlagRemoteSuspend)) {
+          LOG(WARNING) << __PRETTY_FUNCTION__ << ": Peer "
+                       << peer_.PeerAddress()
+                       << " : trigger Suspend as remote initiated";
+          should_suspend = true;
+        } else if (!peer_.IsActivePeer()) {
+          LOG(WARNING) << __PRETTY_FUNCTION__ << ": Peer "
+                       << peer_.PeerAddress()
+                       << " : trigger Suspend as non-active";
+          should_suspend = true;
+        }
 
-      // If peer is A2DP Source, do ACK commands to audio HAL and start media task
-      if (peer_.IsSink() && btif_a2dp_on_started(peer_.PeerAddress(), &p_av->start)) {
-        // Only clear pending flag after acknowledgement
-        peer_.ClearFlags(BtifAvPeer::kFlagPendingStart);
+        // If peer is A2DP Source, do ACK commands to audio HAL and start media
+        // task
+        if (btif_a2dp_on_started(peer_.PeerAddress(), &p_av->start)) {
+          // Only clear pending flag after acknowledgement
+          peer_.ClearFlags(BtifAvPeer::kFlagPendingStart);
+        }
       }
 
       // Remain in Open state if status failed
@@ -1886,17 +1890,20 @@ bool BtifAvStateMachine::StateOpened::ProcessEvent(uint32_t event,
 
     case BTA_AV_CLOSE_EVT:
       // AVDTP link is closed
-      if (peer_.IsActivePeer()) {
-        btif_a2dp_on_stopped(nullptr);
-      }
-
       // Change state to Idle, send acknowledgement if start is pending
       if (peer_.CheckFlags(BtifAvPeer::kFlagPendingStart)) {
         BTIF_TRACE_WARNING("%s: Peer %s : failed pending start request",
                            __PRETTY_FUNCTION__,
                            peer_.PeerAddress().ToString().c_str());
-        btif_a2dp_command_ack(A2DP_CTRL_ACK_FAILURE);
+        tBTA_AV_START av_start = {.chnl = p_av->close.chnl,
+                                  .hndl = p_av->close.hndl,
+                                  .status = BTA_AV_FAIL_STREAM,
+                                  .initiator = true,
+                                  .suspending = true};
+        btif_a2dp_on_started(peer_.PeerAddress(), &av_start);
         // Pending start flag will be cleared when exit current state
+      } else if (peer_.IsActivePeer()) {
+        btif_a2dp_on_stopped(nullptr);
       }
 
       // Inform the application that we are disconnected
@@ -1906,18 +1913,36 @@ bool BtifAvStateMachine::StateOpened::ProcessEvent(uint32_t event,
       break;
 
     case BTA_AV_RECONFIG_EVT:
-      if (peer_.CheckFlags(BtifAvPeer::kFlagPendingStart) &&
-          (p_av->reconfig.status == BTA_AV_SUCCESS)) {
-        LOG_INFO(LOG_TAG,
-                 "%s : Peer %s : Reconfig done - calling BTA_AvStart()",
-                 __PRETTY_FUNCTION__, peer_.PeerAddress().ToString().c_str());
+      if (p_av->reconfig.status != BTA_AV_SUCCESS) {
+        LOG(WARNING) << __PRETTY_FUNCTION__ << ": Peer " << peer_.PeerAddress()
+                     << " : failed reconfiguration";
+        if (peer_.CheckFlags(BtifAvPeer::kFlagPendingStart)) {
+          LOG(ERROR) << __PRETTY_FUNCTION__ << ": Peer " << peer_.PeerAddress()
+                     << " : cannot proceed to do AvStart";
+          peer_.ClearFlags(BtifAvPeer::kFlagPendingStart);
+          btif_a2dp_command_ack(A2DP_CTRL_ACK_FAILURE);
+        }
+        if (peer_.IsSink()) {
+          src_disconnect_sink(peer_.PeerAddress());
+        } else if (peer_.IsSource()) {
+          sink_disconnect_src(peer_.PeerAddress());
+        }
+        break;
+      }
+
+      if (peer_.IsActivePeer()) {
+        LOG(INFO) << __PRETTY_FUNCTION__ << " : Peer " << peer_.PeerAddress()
+                  << " : Reconfig done - calling startSession() to audio HAL";
+        std::promise<void> peer_ready_promise;
+        std::future<void> peer_ready_future = peer_ready_promise.get_future();
+        btif_a2dp_source_start_session(peer_.PeerAddress(),
+                                       std::move(peer_ready_promise));
+      }
+      if (peer_.CheckFlags(BtifAvPeer::kFlagPendingStart)) {
+        LOG(INFO) << __PRETTY_FUNCTION__ << " : Peer " << peer_.PeerAddress()
+                  << " : Reconfig done - calling BTA_AvStart("
+                  << loghex(peer_.BtaHandle()) << ")";
         BTA_AvStart(peer_.BtaHandle());
-      } else if (peer_.CheckFlags(BtifAvPeer::kFlagPendingStart)) {
-        BTIF_TRACE_WARNING("%s: Peer %s : failed reconfiguration",
-                           __PRETTY_FUNCTION__,
-                           peer_.PeerAddress().ToString().c_str());
-        peer_.ClearFlags(BtifAvPeer::kFlagPendingStart);
-        btif_a2dp_command_ack(A2DP_CTRL_ACK_FAILURE);
       }
       break;
 
@@ -2013,15 +2038,14 @@ bool BtifAvStateMachine::StateStarted::ProcessEvent(uint32_t event,
       // always overrides.
       peer_.ClearFlags(BtifAvPeer::kFlagRemoteSuspend);
 
-      if (peer_.IsSink()) {
+      if (peer_.IsSink() &&
+          (peer_.IsActivePeer() || !btif_av_stream_started_ready())) {
         // Immediately stop transmission of frames while suspend is pending
-        if (peer_.IsActivePeer()) {
-          if (event == BTIF_AV_STOP_STREAM_REQ_EVT) {
-            btif_a2dp_on_stopped(nullptr);
-          } else {
-            // (event == BTIF_AV_SUSPEND_STREAM_REQ_EVT)
-            btif_a2dp_source_set_tx_flush(true);
-          }
+        if (event == BTIF_AV_STOP_STREAM_REQ_EVT) {
+          btif_a2dp_on_stopped(nullptr);
+        } else {
+          // ensure tx frames are immediately suspended
+          btif_a2dp_source_set_tx_flush(true);
         }
       } else if (peer_.IsSource()) {
         btif_a2dp_on_stopped(nullptr);
@@ -2056,8 +2080,10 @@ bool BtifAvStateMachine::StateStarted::ProcessEvent(uint32_t event,
                BtifAvEvent::EventName(event).c_str(), p_av->suspend.status,
                p_av->suspend.initiator, peer_.FlagsToString().c_str());
 
-      // A2DP suspended, stop A2DP encoder/decoder until resumed
-      btif_a2dp_on_suspended(&p_av->suspend);
+      // A2DP suspended, stop A2DP encoder / decoder until resumed
+      if (peer_.IsActivePeer() || !btif_av_stream_started_ready()) {
+        btif_a2dp_on_suspended(&p_av->suspend);
+      }
 
       // If not successful, remain in current state
       if (p_av->suspend.status != BTA_AV_SUCCESS) {
@@ -2083,10 +2109,8 @@ bool BtifAvStateMachine::StateStarted::ProcessEvent(uint32_t event,
         state = BTAV_AUDIO_STATE_STOPPED;
       }
 
-      // Suspend completed, clear pending status
-      peer_.ClearFlags(BtifAvPeer::kFlagLocalSuspendPending);
-
       btif_report_audio_state(peer_.PeerAddress(), state);
+      // Suspend completed, clear local pending flags while entering Opened
       peer_.StateMachine().TransitionTo(BtifAvStateMachine::kStateOpened);
     } break;
 
@@ -2099,7 +2123,11 @@ bool BtifAvStateMachine::StateStarted::ProcessEvent(uint32_t event,
       peer_.SetFlags(BtifAvPeer::kFlagPendingStop);
       peer_.ClearFlags(BtifAvPeer::kFlagLocalSuspendPending);
 
-      btif_a2dp_on_stopped(&p_av->suspend);
+      // Don't change the encoder and audio provider state by a non-active peer
+      // since they are shared between peers
+      if (peer_.IsActivePeer() || !btif_av_stream_started_ready()) {
+        btif_a2dp_on_stopped(&p_av->suspend);
+      }
 
       btif_report_audio_state(peer_.PeerAddress(), BTAV_AUDIO_STATE_STOPPED);
 
@@ -2616,11 +2644,11 @@ static void bta_av_sink_media_callback(tBTA_AV_EVT event,
 // Initializes the AV interface for source mode
 static bt_status_t init_src(
     btav_source_callbacks_t* callbacks, int max_connected_audio_devices,
-    std::vector<btav_a2dp_codec_config_t> codec_priorities,
-    std::vector<btav_a2dp_codec_config_t> __unused offload_enabled_codecs) {
+    const std::vector<btav_a2dp_codec_config_t>& codec_priorities,
+    const std::vector<btav_a2dp_codec_config_t>& offloading_preference) {
   BTIF_TRACE_EVENT("%s", __func__);
   return btif_av_source.Init(callbacks, max_connected_audio_devices,
-                             codec_priorities);
+                             codec_priorities, offloading_preference);
 }
 
 // Initializes the AV interface for sink mode
@@ -2804,6 +2832,11 @@ static bt_status_t codec_config_src(
   if (!btif_av_source.Enabled()) {
     LOG(WARNING) << __func__ << ": BTIF AV Source is not enabled";
     return BT_STATUS_NOT_READY;
+  }
+
+  if (peer_address.IsEmpty()) {
+    LOG(WARNING) << __func__ << ": BTIF AV Source needs peer to config";
+    return BT_STATUS_PARM_INVALID;
   }
 
   std::promise<void> peer_ready_promise;
@@ -3231,6 +3264,18 @@ void btif_av_reset_audio_delay(void) { btif_a2dp_control_reset_audio_delay(); }
 
 bool btif_av_is_a2dp_offload_enabled() {
   return btif_av_source.A2dpOffloadEnabled();
+}
+
+bool btif_av_is_a2dp_offload_running() {
+  if (!btif_av_is_a2dp_offload_enabled()) {
+    return false;
+  }
+  if (!bluetooth::audio::a2dp::is_hal_2_0_enabled()) {
+    // since android::hardware::bluetooth::a2dp::V1_0 deprecated, offloading
+    // is supported by Bluetooth Audio HAL 2.0 only.
+    return false;
+  }
+  return bluetooth::audio::a2dp::is_hal_2_0_offloading();
 }
 
 bool btif_av_is_peer_silenced(const RawAddress& peer_address) {

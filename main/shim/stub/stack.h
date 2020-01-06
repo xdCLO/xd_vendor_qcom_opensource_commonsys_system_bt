@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 #include <cstdint>
-#include <future>
 #include <set>
 
 #include "gd/shim/only_include_this_file_into_legacy_stack___ever.h"
@@ -29,7 +28,7 @@ class TestGdShimL2cap : public bluetooth::shim::IL2cap {
   size_t data_buffer_size_{0};
   std::set<uint16_t /* psm */> registered_service_;
 
-  void RegisterService(uint16_t psm,
+  void RegisterService(uint16_t psm, bool use_ertm, uint16_t mtu,
                        bluetooth::shim::ConnectionOpenCallback on_open,
                        std::promise<void> completed) override;
   void UnregisterService(uint16_t psm);
@@ -70,3 +69,5 @@ class TestStack : public bluetooth::shim::IStack {
   void Start();
   void Stop();
 };
+
+extern TestStack test_stack_;

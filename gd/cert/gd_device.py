@@ -14,14 +14,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from gd_device_base import GdDeviceBase
-from gd_device_base import replace_vars
-
 from facade import rootservice_pb2_grpc as facade_rootservice_pb2_grpc
+from gd_device_base import GdDeviceBase, GdDeviceConfigError, replace_vars
 from hal import facade_pb2_grpc as hal_facade_pb2_grpc
 from hci import facade_pb2_grpc as hci_facade_pb2_grpc
 from hci.facade import le_advertising_manager_facade_pb2_grpc
 from l2cap.classic import facade_pb2_grpc as l2cap_facade_pb2_grpc
+from security import facade_pb2_grpc as security_facade_pb2_grpc
 
 ACTS_CONTROLLER_CONFIG_NAME = "GdDevice"
 ACTS_CONTROLLER_REFERENCE_NAME = "gd_devices"
@@ -79,4 +78,6 @@ class GdDevice(GdDeviceBase):
         self.l2cap = l2cap_facade_pb2_grpc.L2capClassicModuleFacadeStub(
             self.grpc_channel)
         self.hci_le_advertising_manager = le_advertising_manager_facade_pb2_grpc.LeAdvertisingManagerFacadeStub(
+            self.grpc_channel)
+        self.security = security_facade_pb2_grpc.SecurityModuleFacadeStub(
             self.grpc_channel)

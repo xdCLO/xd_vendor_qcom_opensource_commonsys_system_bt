@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <set>
 #include <unordered_map>
 
 #include "stack/include/l2c_api.h"
@@ -51,7 +52,7 @@ using PsmData = struct {
 class L2cap {
  public:
   void RegisterService(uint16_t psm, const tL2CAP_APPL_INFO* callbacks,
-                       bool enable_snoop);
+                       bool enable_snoop, tL2CAP_ERTM_INFO* p_ertm_info);
   void UnregisterService(uint16_t psm);
 
   uint16_t CreateConnection(uint16_t psm, const RawAddress& raw_address);
@@ -103,6 +104,8 @@ class L2cap {
   std::unordered_map<uint16_t,
                      std::function<void(std::function<void(uint16_t c)>)>>
       cid_to_postable_map_;
+  std::set<uint16_t> cid_closing_set_;
+
   std::unordered_map<uint16_t, uint16_t> cid_to_psm_map_;
   std::unordered_map<uint16_t, uint16_t> client_psm_to_real_psm_map_;
   std::unordered_map<uint16_t, const tL2CAP_APPL_INFO*> cid_to_callback_map_;
