@@ -17,7 +17,6 @@
 from gd_device_base import GdDeviceBase
 from gd_device_base import replace_vars
 
-from cert.event_stream import EventStream
 from facade import rootservice_pb2_grpc as facade_rootservice_pb2_grpc
 from hal import facade_pb2_grpc as hal_facade_pb2_grpc
 from hci import facade_pb2_grpc as hci_facade_pb2_grpc
@@ -26,6 +25,7 @@ from l2cap.classic import facade_pb2_grpc as l2cap_facade_pb2_grpc
 
 ACTS_CONTROLLER_CONFIG_NAME = "GdDevice"
 ACTS_CONTROLLER_REFERENCE_NAME = "gd_devices"
+
 
 def create(configs):
     if not configs:
@@ -54,34 +54,29 @@ def get_instances_with_configs(configs):
         resolved_cmd = []
         for entry in config["cmd"]:
             resolved_cmd.append(replace_vars(entry, config))
-        devices.append(GdDevice(config["grpc_port"],
-                                config["grpc_root_server_port"],
-                                config["signal_port"],
-                                resolved_cmd, config["label"]))
+        devices.append(
+            GdDevice(config["grpc_port"], config["grpc_root_server_port"],
+                     config["signal_port"], resolved_cmd, config["label"]))
     return devices
 
+
 class GdDevice(GdDeviceBase):
-    def __init__(self, grpc_port, grpc_root_server_port, signal_port, cmd, label):
+
+    def __init__(self, grpc_port, grpc_root_server_port, signal_port, cmd,
+                 label):
         super().__init__(grpc_port, grpc_root_server_port, signal_port, cmd,
                          label, ACTS_CONTROLLER_CONFIG_NAME)
 
         # Facade stubs
-        self.rootservice = facade_rootservice_pb2_grpc.RootFacadeStub(self.grpc_root_server_channel)
+        self.rootservice = facade_rootservice_pb2_grpc.RootFacadeStub(
+            self.grpc_root_server_channel)
         self.hal = hal_facade_pb2_grpc.HciHalFacadeStub(self.grpc_channel)
-        self.controller_read_only_property = facade_rootservice_pb2_grpc.ReadOnlyPropertyStub(self.grpc_channel)
+        self.controller_read_only_property = facade_rootservice_pb2_grpc.ReadOnlyPropertyStub(
+            self.grpc_channel)
         self.hci = hci_facade_pb2_grpc.AclManagerFacadeStub(self.grpc_channel)
-        self.hci_classic_security = hci_facade_pb2_grpc.ClassicSecurityManagerFacadeStub(self.grpc_channel)
-        self.l2cap = l2cap_facade_pb2_grpc.L2capClassicModuleFacadeStub(self.grpc_channel)
-        self.hci_le_advertising_manager = le_advertising_manager_facade_pb2_grpc.LeAdvertisingManagerFacadeStub(self.grpc_channel)
-
-        # Event streams
-        self.hal.hci_event_stream = EventStream(self.hal.FetchHciEvent)
-        self.hal.hci_acl_stream = EventStream(self.hal.FetchHciAcl)
-        self.hal.hci_sco_stream = EventStream(self.hal.FetchHciSco)
-        self.hci.connection_complete_stream = EventStream(self.hci.FetchConnectionComplete)
-        self.hci.disconnection_stream = EventStream(self.hci.FetchDisconnection)
-        self.hci.connection_failed_stream = EventStream(self.hci.FetchConnectionFailed)
-        self.hci.acl_stream = EventStream(self.hci.FetchAclData)
-        self.hci_classic_security.command_complete_stream = EventStream(self.hci_classic_security.FetchCommandCompleteEvent)
-        self.l2cap.packet_stream = EventStream(self.l2cap.FetchL2capData)
-        self.l2cap.connection_complete_stream = EventStream(self.l2cap.FetchConnectionComplete)
+        self.hci_classic_security = hci_facade_pb2_grpc.ClassicSecurityManagerFacadeStub(
+            self.grpc_channel)
+        self.l2cap = l2cap_facade_pb2_grpc.L2capClassicModuleFacadeStub(
+            self.grpc_channel)
+        self.hci_le_advertising_manager = le_advertising_manager_facade_pb2_grpc.LeAdvertisingManagerFacadeStub(
+            self.grpc_channel)

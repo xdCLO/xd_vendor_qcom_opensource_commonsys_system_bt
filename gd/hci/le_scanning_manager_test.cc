@@ -14,20 +14,19 @@
  * limitations under the License.
  */
 
-#include "hci/le_scanning_manager.h"
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <chrono>
 #include <future>
 #include <map>
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include "common/bind.h"
 #include "hci/address.h"
 #include "hci/controller.h"
 #include "hci/hci_layer.h"
+#include "hci/le_scanning_manager.h"
 #include "os/thread.h"
 #include "packet/raw_builder.h"
 
@@ -187,12 +186,13 @@ class LeScanningManagerTest : public ::testing::Test {
     fake_registry_.InjectTestModule(&Controller::Factory, test_controller_);
     client_handler_ = fake_registry_.GetTestModuleHandler(&HciLayer::Factory);
     ASSERT_NE(client_handler_, nullptr);
-    mock_callbacks_.handler = client_handler_;
+    mock_callbacks_.handler_ = client_handler_;
     std::future<void> config_future = test_hci_layer_->GetCommandFuture();
     fake_registry_.Start<LeScanningManager>(&thread_);
     le_scanning_manager =
         static_cast<LeScanningManager*>(fake_registry_.GetModuleUnderTest(&LeScanningManager::Factory));
-    config_future.wait_for(std::chrono::duration(std::chrono::milliseconds(1000)));
+    auto result = config_future.wait_for(std::chrono::duration(std::chrono::milliseconds(1000)));
+    ASSERT_EQ(std::future_status::ready, result);
     HandleConfiguration();
   }
 
@@ -217,6 +217,10 @@ class LeScanningManagerTest : public ::testing::Test {
    public:
     MOCK_METHOD(void, on_advertisements, (std::vector<std::shared_ptr<LeReport>>), (override));
     MOCK_METHOD(void, on_timeout, (), (override));
+    os::Handler* Handler() {
+      return handler_;
+    }
+    os::Handler* handler_{nullptr};
   } mock_callbacks_;
 
   OpCode param_opcode_{OpCode::LE_SET_ADVERTISING_PARAMETERS};
@@ -254,7 +258,8 @@ TEST_F(LeScanningManagerTest, start_scan_test) {
   auto next_command_future = test_hci_layer_->GetCommandFuture();
   le_scanning_manager->StartScan(&mock_callbacks_);
 
-  next_command_future.wait_for(std::chrono::duration(std::chrono::milliseconds(100)));
+  auto result = next_command_future.wait_for(std::chrono::duration(std::chrono::milliseconds(100)));
+  ASSERT_EQ(std::future_status::ready, result);
   test_hci_layer_->IncomingEvent(LeSetScanEnableCompleteBuilder::Create(uint8_t{1}, ErrorCode::SUCCESS));
 
   LeAdvertisingReport report{};
@@ -280,7 +285,8 @@ TEST_F(LeAndroidHciScanningManagerTest, start_scan_test) {
   auto next_command_future = test_hci_layer_->GetCommandFuture();
   le_scanning_manager->StartScan(&mock_callbacks_);
 
-  next_command_future.wait_for(std::chrono::duration(std::chrono::milliseconds(100)));
+  auto result = next_command_future.wait_for(std::chrono::duration(std::chrono::milliseconds(100)));
+  ASSERT_EQ(std::future_status::ready, result);
   test_hci_layer_->IncomingEvent(LeSetScanEnableCompleteBuilder::Create(uint8_t{1}, ErrorCode::SUCCESS));
 
   LeAdvertisingReport report{};
@@ -306,7 +312,8 @@ TEST_F(LeExtendedScanningManagerTest, start_scan_test) {
   auto next_command_future = test_hci_layer_->GetCommandFuture();
   le_scanning_manager->StartScan(&mock_callbacks_);
 
-  next_command_future.wait_for(std::chrono::duration(std::chrono::milliseconds(100)));
+  auto result = next_command_future.wait_for(std::chrono::duration(std::chrono::milliseconds(100)));
+  ASSERT_EQ(std::future_status::ready, result);
   auto packet = test_hci_layer_->GetCommandPacket(OpCode::LE_SET_EXTENDED_SCAN_ENABLE);
 
   test_hci_layer_->IncomingEvent(LeSetScanEnableCompleteBuilder::Create(uint8_t{1}, ErrorCode::SUCCESS));

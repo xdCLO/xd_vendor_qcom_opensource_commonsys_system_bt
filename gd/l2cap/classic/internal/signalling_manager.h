@@ -41,7 +41,7 @@ namespace classic {
 namespace internal {
 
 struct PendingCommand {
-  SignalId signal_id_;
+  SignalId signal_id_ = kInvalidSignalId;
   CommandCode command_code_;
   Psm psm_;
   Cid source_cid_;
@@ -106,13 +106,14 @@ class ClassicSignallingManager {
 
   os::Handler* handler_;
   Link* link_;
-  [[maybe_unused]] l2cap::internal::DataPipelineManager* data_pipeline_manager_;
+  l2cap::internal::DataPipelineManager* data_pipeline_manager_;
   std::shared_ptr<classic::internal::FixedChannelImpl> signalling_channel_;
   DynamicChannelServiceManagerImpl* dynamic_service_manager_;
   l2cap::internal::DynamicChannelAllocator* channel_allocator_;
   FixedChannelServiceManagerImpl* fixed_service_manager_;
   std::unique_ptr<os::EnqueueBuffer<packet::BasePacketBuilder>> enqueue_buffer_;
   std::queue<PendingCommand> pending_commands_;
+  PendingCommand command_just_sent_;
   os::Alarm alarm_;
   SignalId next_signal_id_ = kInitialSignalId;
   std::unordered_map<Cid, ChannelConfigurationState> channel_configuration_;

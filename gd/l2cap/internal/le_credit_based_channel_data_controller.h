@@ -24,6 +24,7 @@
 #include "l2cap/cid.h"
 #include "l2cap/internal/channel_impl.h"
 #include "l2cap/internal/data_controller.h"
+#include "l2cap/internal/ilink.h"
 #include "l2cap/internal/scheduler.h"
 #include "l2cap/l2cap_packets.h"
 #include "l2cap/mtu.h"
@@ -41,8 +42,8 @@ class LeCreditBasedDataController : public DataController {
   using UpperEnqueue = packet::PacketView<packet::kLittleEndian>;
   using UpperDequeue = packet::BasePacketBuilder;
   using UpperQueueDownEnd = common::BidiQueueEnd<UpperEnqueue, UpperDequeue>;
-  LeCreditBasedDataController(Cid cid, Cid remote_cid, UpperQueueDownEnd* channel_queue_end, os::Handler* handler,
-                              Scheduler* scheduler);
+  LeCreditBasedDataController(ILink* link, Cid cid, Cid remote_cid, UpperQueueDownEnd* channel_queue_end,
+                              os::Handler* handler, Scheduler* scheduler);
 
   void OnSdu(std::unique_ptr<packet::BasePacketBuilder> sdu) override;
   void OnPdu(packet::PacketView<true> pdu) override;
@@ -64,9 +65,11 @@ class LeCreditBasedDataController : public DataController {
   os::Handler* handler_;
   std::queue<std::unique_ptr<packet::BasePacketBuilder>> pdu_queue_;
   Scheduler* scheduler_;
+  ILink* link_;
   Mtu mtu_ = 512;
   uint16_t mps_ = 251;
   uint16_t credits_ = 0;
+  uint16_t pending_frames_count_ = 0;
 
   class PacketViewForReassembly : public packet::PacketView<kLittleEndian> {
    public:
