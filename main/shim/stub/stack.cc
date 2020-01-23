@@ -18,7 +18,7 @@
 
 #include "gd/shim/only_include_this_file_into_legacy_stack___ever.h"
 #include "main/shim/entry.h"
-#include "main/shim/test_stack.h"
+#include "main/shim/stub/stack.h"
 #include "osi/include/log.h"
 
 #define ASSERT(condition)                                    \
@@ -28,8 +28,15 @@
     }                                                        \
   } while (false)
 
+TestStack test_stack_;
+
+bluetooth::shim::IStack* bluetooth::shim::GetGabeldorscheStack() {
+  return (bluetooth::shim::IStack*)&test_stack_;
+}
+
 void TestGdShimL2cap::RegisterService(
-    uint16_t psm, bluetooth::shim::ConnectionOpenCallback on_open,
+    uint16_t psm, bool use_ertm, uint16_t mtu,
+    bluetooth::shim::ConnectionOpenCallback on_open,
     std::promise<void> completed) {
   completed.set_value();
   registered_service_.insert(psm);

@@ -26,6 +26,7 @@
 
 #include <base/location.h>
 #include <base/logging.h>
+#include "btu.h"
 #include "buffer_allocator.h"
 #include "osi/include/log.h"
 
@@ -54,6 +55,7 @@ extern void hci_event_received(const base::Location& from_here, BT_HDR* packet);
 extern void acl_event_received(BT_HDR* packet);
 extern void sco_data_received(BT_HDR* packet);
 extern void iso_data_received(BT_HDR* packet);
+extern void hal_service_died();
 
 android::sp<V1_0::IBluetoothHci> btHci;
 android::sp<V1_1::IBluetoothHci> btHci_1_1;
@@ -62,7 +64,7 @@ class BluetoothHciDeathRecipient : public hidl_death_recipient {
  public:
   virtual void serviceDied(uint64_t /*cookie*/, const android::wp<::android::hidl::base::V1_0::IBase>& /*who*/) {
     LOG_ERROR(LOG_TAG, "Bluetooth HAL service died!");
-    abort();
+    hal_service_died();
   }
 };
 android::sp<BluetoothHciDeathRecipient> bluetoothHciDeathRecipient = new BluetoothHciDeathRecipient();
@@ -88,32 +90,46 @@ class BluetoothHciCallbacks : public V1_1::IBluetoothHciCallbacks {
   }
 
   Return<void> initializationComplete(Status status) override {
+    // Do not fire the hwbinder timer here because the main thread is blocked
+    // before the initialization is completed.
     CHECK(status == Status::SUCCESS);
     initialization_complete();
     return Void();
   }
 
   Return<void> hciEventReceived(const hidl_vec<uint8_t>& event) override {
+    main_thread_hwbinder_timer_start(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(__func__));
     BT_HDR* packet = WrapPacketAndCopy(MSG_HC_TO_STACK_HCI_EVT, event);
     hci_event_received(FROM_HERE, packet);
+    main_thread_hwbinder_timer_stop();
     return Void();
   }
 
   Return<void> aclDataReceived(const hidl_vec<uint8_t>& data) override {
+    main_thread_hwbinder_timer_start(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(__func__));
     BT_HDR* packet = WrapPacketAndCopy(MSG_HC_TO_STACK_HCI_ACL, data);
     acl_event_received(packet);
+    main_thread_hwbinder_timer_stop();
     return Void();
   }
 
   Return<void> scoDataReceived(const hidl_vec<uint8_t>& data) override {
+    main_thread_hwbinder_timer_start(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(__func__));
     BT_HDR* packet = WrapPacketAndCopy(MSG_HC_TO_STACK_HCI_SCO, data);
     sco_data_received(packet);
+    main_thread_hwbinder_timer_stop();
     return Void();
   }
 
   Return<void> isoDataReceived(const hidl_vec<uint8_t>& data) override {
+    main_thread_hwbinder_timer_start(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(__func__));
     BT_HDR* packet = WrapPacketAndCopy(MSG_HC_TO_STACK_HCI_ISO, data);
     iso_data_received(packet);
+    main_thread_hwbinder_timer_stop();
     return Void();
   }
 

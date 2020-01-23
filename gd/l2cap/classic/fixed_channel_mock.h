@@ -13,34 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #pragma once
 
-#include <grpc++/grpc++.h>
+#include "l2cap/classic/fixed_channel.h"
+#include "l2cap/classic/internal/fixed_channel_impl_mock.h"
+#include "os/handler.h"
 
-#include "grpc/grpc_module.h"
+#include <gmock/gmock.h>
 
+#include <utility>
+
+// Unit test interfaces
 namespace bluetooth {
-namespace hal {
-namespace cert {
+namespace l2cap {
+namespace classic {
+namespace testing {
 
-class HciHalCertService;
-
-class HalCertModule : public ::bluetooth::grpc::GrpcFacadeModule {
+class MockFixedChannel : public FixedChannel {
  public:
-  static const ModuleFactory Factory;
-
-  void ListDependencies(ModuleList* list) override;
-
-  void Start() override;
-  void Stop() override;
-
-  ::grpc::Service* GetService() const override;
-
- private:
-  HciHalCertService* service_;
+  MockFixedChannel() : FixedChannel(nullptr, nullptr){};
+  MOCK_METHOD(void, Acquire, ());
+  MOCK_METHOD(void, Release, ());
+  MOCK_METHOD(void, RegisterOnCloseCallback, (os::Handler * handler, OnCloseCallback on_close_callback));
 };
 
-}  // namespace cert
-}  // namespace hal
+}  // namespace testing
+}  // namespace classic
+}  // namespace l2cap
 }  // namespace bluetooth
