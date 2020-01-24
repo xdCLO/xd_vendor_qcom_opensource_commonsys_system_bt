@@ -142,6 +142,8 @@ class AclConnection {
   virtual bool ReadAfhChannelMap();
   virtual bool ReadRssi();
   virtual bool ReadClock(WhichClock which_clock);
+  virtual bool ReadRemoteSupportedFeatures();
+  virtual bool ReadRemoteExtendedFeatures();
 
   // LE ACL Method
   virtual bool LeConnectionUpdate(uint16_t conn_interval_min, uint16_t conn_interval_max, uint16_t conn_latency,
@@ -216,6 +218,9 @@ class AclManager : public Module {
 
   // Should register only once when user module starts.
   virtual void RegisterAclManagerCallbacks(AclManagerCallbacks* callbacks, os::Handler* handler);
+
+  // Should register only once when user module starts.
+  virtual void RegisterLeAclManagerCallbacks(AclManagerCallbacks* callbacks, os::Handler* handler);
 
   // Generates OnConnectSuccess if connected, or OnConnectFail otherwise
   virtual void CreateConnection(Address address);

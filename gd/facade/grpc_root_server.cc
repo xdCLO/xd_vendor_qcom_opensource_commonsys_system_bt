@@ -22,11 +22,30 @@
 #include "facade/rootservice.grpc.pb.h"
 #include "grpc/grpc_module.h"
 #include "hal/facade.h"
-#include "hci/facade.h"
+#include "hci/facade/acl_manager_facade.h"
+#include "hci/facade/controller_facade.h"
+#include "hci/facade/facade.h"
+#include "hci/facade/le_acl_manager_facade.h"
+#include "hci/facade/le_advertising_manager_facade.h"
+#include "hci/facade/le_scanning_manager_facade.h"
 #include "l2cap/classic/facade.h"
+#include "neighbor/facade/facade.h"
 #include "os/log.h"
 #include "os/thread.h"
 #include "security/facade.h"
+#include "shim/advertising.h"
+#include "shim/connectability.h"
+#include "shim/controller.h"
+#include "shim/discoverability.h"
+#include "shim/dumpsys.h"
+#include "shim/hci_layer.h"
+#include "shim/inquiry.h"
+#include "shim/l2cap.h"
+#include "shim/name.h"
+#include "shim/page.h"
+#include "shim/scanning.h"
+#include "shim/security.h"
+#include "shim/storage.h"
 #include "stack_manager.h"
 
 namespace bluetooth {
@@ -56,16 +75,42 @@ class RootFacadeService : public ::bluetooth::facade::RootFacade::Service {
         break;
       case BluetoothModule::HCI:
         modules.add<::bluetooth::facade::ReadOnlyPropertyServerModule>();
-        modules.add<::bluetooth::hci::AclManagerFacadeModule>();
-        modules.add<::bluetooth::hci::ClassicSecurityManagerFacadeModule>();
+        modules.add<::bluetooth::hci::facade::HciLayerFacadeModule>();
+        break;
+      case BluetoothModule::HCI_INTERFACES:
+        modules.add<::bluetooth::facade::ReadOnlyPropertyServerModule>();
+        modules.add<::bluetooth::hci::facade::HciLayerFacadeModule>();
+        modules.add<::bluetooth::hci::facade::AclManagerFacadeModule>();
+        modules.add<::bluetooth::hci::facade::ControllerFacadeModule>();
+        modules.add<::bluetooth::hci::facade::LeAclManagerFacadeModule>();
+        modules.add<::bluetooth::hci::facade::LeAdvertisingManagerFacadeModule>();
+        modules.add<::bluetooth::hci::facade::LeScanningManagerFacadeModule>();
+        modules.add<::bluetooth::neighbor::facade::NeighborFacadeModule>();
         break;
       case BluetoothModule::L2CAP:
+        modules.add<::bluetooth::hci::facade::ControllerFacadeModule>();
+        modules.add<::bluetooth::neighbor::facade::NeighborFacadeModule>();
         modules.add<::bluetooth::facade::ReadOnlyPropertyServerModule>();
         modules.add<::bluetooth::l2cap::classic::L2capClassicModuleFacadeModule>();
         break;
       case BluetoothModule::SECURITY:
         modules.add<::bluetooth::facade::ReadOnlyPropertyServerModule>();
         modules.add<::bluetooth::security::SecurityModuleFacadeModule>();
+        break;
+      case BluetoothModule::SHIM:
+        modules.add<::bluetooth::shim::Advertising>();
+        modules.add<::bluetooth::shim::Connectability>();
+        modules.add<::bluetooth::shim::Controller>();
+        modules.add<::bluetooth::shim::Discoverability>();
+        modules.add<::bluetooth::shim::Dumpsys>();
+        modules.add<::bluetooth::shim::HciLayer>();
+        modules.add<::bluetooth::shim::Inquiry>();
+        modules.add<::bluetooth::shim::L2cap>();
+        modules.add<::bluetooth::shim::Name>();
+        modules.add<::bluetooth::shim::Page>();
+        modules.add<::bluetooth::shim::Scanning>();
+        modules.add<::bluetooth::shim::Security>();
+        modules.add<::bluetooth::shim::Storage>();
         break;
       default:
         return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, "invalid module under test");

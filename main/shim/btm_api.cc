@@ -1060,3 +1060,12 @@ uint8_t bluetooth::shim::BTM_BleMaxMultiAdvInstanceCount() {
 bool bluetooth::shim::BTM_BleLocalPrivacyEnabled(void) {
   return controller_get_interface()->supports_ble_privacy();
 }
+
+tBTM_STATUS bluetooth::shim::BTM_SecBond(const RawAddress& bd_addr,
+                                         tBLE_ADDR_TYPE addr_type,
+                                         tBT_TRANSPORT transport,
+                                         uint8_t pin_len, uint8_t* p_pin,
+                                         uint32_t trusted_mask[]) {
+  return shim_btm.CreateBond(bd_addr, addr_type, transport, pin_len, p_pin,
+                             trusted_mask);
+}

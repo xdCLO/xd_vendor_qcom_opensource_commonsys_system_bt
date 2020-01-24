@@ -37,13 +37,17 @@
 #include "shim/connectability.h"
 #include "shim/controller.h"
 #include "shim/discoverability.h"
+#include "shim/dumpsys.h"
 #include "shim/hci_layer.h"
 #include "shim/inquiry.h"
 #include "shim/l2cap.h"
 #include "shim/name.h"
 #include "shim/page.h"
 #include "shim/scanning.h"
+#include "shim/security.h"
+#include "shim/storage.h"
 #include "stack_manager.h"
+#include "storage/legacy.h"
 
 using ::bluetooth::os::Thread;
 
@@ -71,14 +75,18 @@ struct bluetooth::shim::Stack::impl {
     modules.add<::bluetooth::shim::Controller>();
     modules.add<::bluetooth::shim::HciLayer>();
     modules.add<::bluetooth::security::SecurityModule>();
+    modules.add<::bluetooth::storage::LegacyModule>();
     modules.add<::bluetooth::shim::Advertising>();
     modules.add<::bluetooth::shim::Connectability>();
     modules.add<::bluetooth::shim::Discoverability>();
+    modules.add<::bluetooth::shim::Dumpsys>();
     modules.add<::bluetooth::shim::Inquiry>();
     modules.add<::bluetooth::shim::Name>();
     modules.add<::bluetooth::shim::L2cap>();
     modules.add<::bluetooth::shim::Page>();
     modules.add<::bluetooth::shim::Scanning>();
+    modules.add<::bluetooth::shim::Security>();
+    modules.add<::bluetooth::shim::Storage>();
 
     stack_thread_ = new Thread("gd_stack_thread", Thread::Priority::NORMAL);
     stack_manager_.StartUp(&modules, stack_thread_);
@@ -101,43 +109,68 @@ struct bluetooth::shim::Stack::impl {
   }
 
   IAdvertising* GetAdvertising() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::Advertising>();
   }
 
   IController* GetController() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::Controller>();
   }
 
   IConnectability* GetConnectability() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::Connectability>();
   }
 
   IDiscoverability* GetDiscoverability() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::Discoverability>();
   }
 
+  IDumpsys* GetDumpsys() {
+    ASSERT(is_running_);
+    return stack_manager_.GetInstance<bluetooth::shim::Dumpsys>();
+  }
+
   IHciLayer* GetHciLayer() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::HciLayer>();
   }
 
   IInquiry* GetInquiry() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::Inquiry>();
   }
 
   IL2cap* GetL2cap() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::L2cap>();
   }
 
   IName* GetName() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::Name>();
   }
 
   IPage* GetPage() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::Page>();
   }
 
   IScanning* GetScanning() {
+    ASSERT(is_running_);
     return stack_manager_.GetInstance<bluetooth::shim::Scanning>();
+  }
+
+  ISecurity* GetSecurity() {
+    ASSERT(is_running_);
+    return stack_manager_.GetInstance<bluetooth::shim::Security>();
+  }
+
+  IStorage* GetStorage() {
+    ASSERT(is_running_);
+    return stack_manager_.GetInstance<bluetooth::shim::Storage>();
   }
 
  private:
@@ -175,6 +208,10 @@ bluetooth::shim::IDiscoverability* bluetooth::shim::Stack::GetDiscoverability() 
   return pimpl_->GetDiscoverability();
 }
 
+bluetooth::shim::IDumpsys* bluetooth::shim::Stack::GetDumpsys() {
+  return pimpl_->GetDumpsys();
+}
+
 bluetooth::shim::IHciLayer* bluetooth::shim::Stack::GetHciLayer() {
   return pimpl_->GetHciLayer();
 }
@@ -197,6 +234,14 @@ bluetooth::shim::IPage* bluetooth::shim::Stack::GetPage() {
 
 bluetooth::shim::IScanning* bluetooth::shim::Stack::GetScanning() {
   return pimpl_->GetScanning();
+}
+
+bluetooth::shim::ISecurity* bluetooth::shim::Stack::GetSecurity() {
+  return pimpl_->GetSecurity();
+}
+
+bluetooth::shim::IStorage* bluetooth::shim::Stack::GetStorage() {
+  return pimpl_->GetStorage();
 }
 
 bluetooth::shim::IStack* bluetooth::shim::GetGabeldorscheStack() {

@@ -1189,26 +1189,10 @@ extern void BTM_PINCodeReply(const RawAddress& bd_addr, uint8_t res,
  *
  * Function         BTM_SecBond
  *
- * Description      This function is called to perform bonding with peer device.
- *
- * Parameters:      bd_addr      - Address of the device to bond
- *                  pin_len      - length in bytes of the PIN Code
- *                  p_pin        - pointer to array with the PIN Code
- *                  trusted_mask - bitwise OR of trusted services
- *                                 (array of uint32_t)
- * Returns          BTM_CMD_STARTED if successfully initiated, otherwise error
- *
- ******************************************************************************/
-extern tBTM_STATUS BTM_SecBond(const RawAddress& bd_addr, uint8_t pin_len,
-                               uint8_t* p_pin, uint32_t trusted_mask[]);
-
-/*******************************************************************************
- *
- * Function         BTM_SecBondByTransport
- *
  * Description      Perform bonding by designated transport
  *
  * Parameters:      bd_addr      - Address of the device to bond
+ *                  addr_type    - address type for LE transport
  *                  pin_len      - length in bytes of the PIN Code
  *                  p_pin        - pointer to array with the PIN Code
  *                  trusted_mask - bitwise OR of trusted services
@@ -1219,10 +1203,10 @@ extern tBTM_STATUS BTM_SecBond(const RawAddress& bd_addr, uint8_t pin_len,
  * Returns          BTM_CMD_STARTED if successfully initiated, otherwise error
  *
  ******************************************************************************/
-extern tBTM_STATUS BTM_SecBondByTransport(const RawAddress& bd_addr,
-                                          tBT_TRANSPORT transport,
-                                          uint8_t pin_len, uint8_t* p_pin,
-                                          uint32_t trusted_mask[]);
+extern tBTM_STATUS BTM_SecBond(const RawAddress& bd_addr,
+                               tBLE_ADDR_TYPE addr_type,
+                               tBT_TRANSPORT transport, uint8_t pin_len,
+                               uint8_t* p_pin, uint32_t trusted_mask[]);
 
 /*******************************************************************************
  *

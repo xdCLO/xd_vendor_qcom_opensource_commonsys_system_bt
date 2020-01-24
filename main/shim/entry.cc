@@ -46,6 +46,10 @@ bluetooth::shim::IDiscoverability* bluetooth::shim::GetDiscoverability() {
   return GetGabeldorscheStack()->GetDiscoverability();
 }
 
+bluetooth::shim::IDumpsys* bluetooth::shim::GetDumpsys() {
+  return GetGabeldorscheStack()->GetDumpsys();
+}
+
 bluetooth::shim::IInquiry* bluetooth::shim::GetInquiry() {
   return GetGabeldorscheStack()->GetInquiry();
 }
@@ -68,4 +72,12 @@ bluetooth::shim::IPage* bluetooth::shim::GetPage() {
 
 bluetooth::shim::IScanning* bluetooth::shim::GetScanning() {
   return GetGabeldorscheStack()->GetScanning();
+}
+
+bluetooth::shim::ISecurity* bluetooth::shim::GetSecurity() {
+  return GetGabeldorscheStack()->GetSecurity();
+}
+
+bluetooth::shim::IStorage* bluetooth::shim::GetStorage() {
+  return GetGabeldorscheStack()->GetStorage();
 }

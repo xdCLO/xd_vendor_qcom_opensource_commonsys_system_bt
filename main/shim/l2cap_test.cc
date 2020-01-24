@@ -47,7 +47,7 @@ L2capTest* l2cap_test_ = nullptr;
 
 class L2capTest : public ::testing::Test {
  public:
-  static shim::L2cap* l2cap_;
+  static shim::legacy::L2cap* l2cap_;
 
   struct {
     int L2caConnectCfmCb;
@@ -77,7 +77,7 @@ class L2capTest : public ::testing::Test {
 
  protected:
   void SetUp() override {
-    l2cap_ = new shim::L2cap();
+    l2cap_ = new shim::legacy::L2cap();
     l2cap_test_ = this;
   }
 
@@ -89,7 +89,7 @@ class L2capTest : public ::testing::Test {
   uint8_t data_buffer_[kDataBufferSize];
 };
 
-shim::L2cap* L2capTest::l2cap_ = nullptr;
+shim::legacy::L2cap* L2capTest::l2cap_ = nullptr;
 // Indication of remotely initiated connection response sent
 void L2caConnectIndCb(const RawAddress& raw_address, uint16_t a, uint16_t b,
                       uint8_t c) {
@@ -227,7 +227,8 @@ TEST_F(L2capTest, CreateConnection_ConfigRequest) {
   CHECK(cid != 0);
 
   // Simulate a successful connection response
-  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid);
+  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid,
+                                            true);
   CHECK(cnt_.L2caConnectCfmCb == 1);
 
   CHECK(l2cap_->ConfigRequest(cid, nullptr));
@@ -244,7 +245,8 @@ TEST_F(L2capTest, CreateConnection_ConfigResponse) {
   CHECK(cid != 0);
 
   // Simulate a successful connection response
-  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid);
+  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid,
+                                            true);
   CHECK(cnt_.L2caConnectCfmCb == 1);
 
   CHECK(l2cap_->ConfigResponse(cid, nullptr));
@@ -261,7 +263,8 @@ TEST_F(L2capTest, CreateConnection_DisconnectRequest) {
   CHECK(cid != 0);
 
   // Simulate a successful connection response
-  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid);
+  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid,
+                                            true);
   CHECK(cnt_.L2caConnectCfmCb == 1);
 
   CHECK(l2cap_->DisconnectRequest(cid));
@@ -278,7 +281,8 @@ TEST_F(L2capTest, CreateConnection_DisconnectResponse) {
   CHECK(cid != 0);
 
   // Simulate a successful connection response
-  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid);
+  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid,
+                                            true);
   CHECK(cnt_.L2caConnectCfmCb == 1);
 
   CHECK(l2cap_->DisconnectResponse(cid));
@@ -295,7 +299,8 @@ TEST_F(L2capTest, CreateConnection_WithHandshake) {
   CHECK(cid != 0);
 
   // Simulate a successful connection response
-  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid);
+  l2cap_->OnLocalInitiatedConnectionCreated("11:22:33:44:55:66", kPsm, kCid,
+                                            true);
   CHECK(cnt_.L2caConnectCfmCb == 1);
 
   CHECK(l2cap_->ConfigRequest(cid, nullptr) == true);

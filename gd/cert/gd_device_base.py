@@ -40,6 +40,9 @@ def replace_vars(string, config):
     rootcanal_port = config.get("rootcanal_port")
     if rootcanal_port is None:
         rootcanal_port = ""
+    if serial_number == "DUT" or serial_number == "CERT":
+        logging.warn("Did you forget to configure the serial number?")
+        raise Exception
     return string.replace("$ANDROID_HOST_OUT", ANDROID_HOST_OUT) \
                  .replace("$(grpc_port)", config.get("grpc_port")) \
                  .replace("$(grpc_root_server_port)", config.get("grpc_root_server_port")) \
@@ -95,10 +98,11 @@ class GdDeviceBase:
     def clean_up(self):
         self.grpc_channel.close()
         self.grpc_root_server_channel.close()
-        self.backing_process.send_signal(signal.SIGINT)
+        stop_signal = signal.SIGINT
+        self.backing_process.send_signal(stop_signal)
         backing_process_return_code = self.backing_process.wait()
         self.backing_process_logs.close()
-        if backing_process_return_code != 0:
+        if backing_process_return_code not in [-stop_signal, 0]:
             logging.error("backing process %s stopped with code: %d" %
                           (self.label, backing_process_return_code))
             return False
