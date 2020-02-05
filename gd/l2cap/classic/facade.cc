@@ -20,7 +20,6 @@
 #include "common/bind.h"
 #include "grpc/grpc_event_queue.h"
 #include "hci/address.h"
-#include "hci/hci_layer.h"
 #include "l2cap/classic/facade.grpc.pb.h"
 #include "l2cap/classic/facade.h"
 #include "l2cap/classic/l2cap_classic_module.h"
@@ -328,9 +327,9 @@ class L2capClassicModuleFacadeService : public L2capClassicModuleFacade::Service
           channel_->GetQueueUpEnd()->UnregisterDequeue();
         }
       }
-      channel_ = nullptr;
       classic::ConnectionCloseEvent event;
       event.mutable_remote()->set_address(channel_->GetDevice().ToString());
+      channel_ = nullptr;
       event.set_reason(static_cast<uint32_t>(error_code));
       facade_service_->pending_connection_close_.OnIncomingEvent(event);
     }
@@ -386,13 +385,10 @@ class L2capClassicModuleFacadeService : public L2capClassicModuleFacade::Service
 void L2capClassicModuleFacadeModule::ListDependencies(ModuleList* list) {
   ::bluetooth::grpc::GrpcFacadeModule::ListDependencies(list);
   list->add<l2cap::classic::L2capClassicModule>();
-  list->add<hci::HciLayer>();
 }
 
 void L2capClassicModuleFacadeModule::Start() {
   ::bluetooth::grpc::GrpcFacadeModule::Start();
-  GetDependency<hci::HciLayer>()->EnqueueCommand(hci::WriteScanEnableBuilder::Create(hci::ScanEnable::PAGE_SCAN_ONLY),
-                                                 common::BindOnce([](hci::CommandCompleteView) {}), GetHandler());
   service_ = new L2capClassicModuleFacadeService(GetDependency<l2cap::classic::L2capClassicModule>(), GetHandler());
 }
 

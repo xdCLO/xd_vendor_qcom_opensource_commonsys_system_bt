@@ -36,9 +36,9 @@ bluetooth::shim::IStack* bluetooth::shim::GetGabeldorscheStack() {
 
 void TestGdShimL2cap::RegisterService(
     uint16_t psm, bool use_ertm, uint16_t mtu,
-    bluetooth::shim::ConnectionOpenCallback on_open,
-    std::promise<void> completed) {
-  completed.set_value();
+    bluetooth::shim::ConnectionCompleteCallback on_complete,
+    std::promise<void> registered) {
+  registered.set_value();
   registered_service_.insert(psm);
 }
 
@@ -48,9 +48,9 @@ void TestGdShimL2cap::UnregisterService(uint16_t psm) {
 
 void TestGdShimL2cap::CreateConnection(
     uint16_t psm, const std::string address,
-    bluetooth::shim::ConnectionOpenCallback on_open,
-    std::promise<uint16_t> completed) {
-  completed.set_value(cid_);
+    bluetooth::shim::ConnectionCompleteCallback on_complete,
+    std::promise<uint16_t> created) {
+  created.set_value(cid_);
 }
 
 void TestGdShimL2cap::CloseConnection(uint16_t cid) {}
@@ -66,12 +66,6 @@ void TestGdShimL2cap::Write(uint16_t cid, const uint8_t* data, size_t len) {
   ASSERT(data_buffer_size_ > len);
   memcpy(data_buffer_, data, len);
 }
-
-void TestGdShimL2cap::WriteFlushable(uint16_t cid, const uint8_t* data,
-                                     size_t len) {}
-
-void TestGdShimL2cap::WriteNonFlushable(uint16_t cid, const uint8_t* data,
-                                        size_t len) {}
 
 void TestGdShimL2cap::SendLoopbackResponse(std::function<void()> function) {
   function();
@@ -93,6 +87,8 @@ bluetooth::shim::IDiscoverability* TestStack::GetDiscoverability() {
   return nullptr;
 }
 
+bluetooth::shim::IDumpsys* TestStack::GetDumpsys() { return nullptr; }
+
 bluetooth::shim::IHciLayer* TestStack::GetHciLayer() { return nullptr; }
 
 bluetooth::shim::IInquiry* TestStack::GetInquiry() { return nullptr; }
@@ -104,3 +100,7 @@ bluetooth::shim::IName* TestStack::GetName() { return nullptr; }
 bluetooth::shim::IPage* TestStack::GetPage() { return nullptr; }
 
 bluetooth::shim::IScanning* TestStack::GetScanning() { return nullptr; }
+
+bluetooth::shim::ISecurity* TestStack::GetSecurity() { return nullptr; }
+
+bluetooth::shim::IStorage* TestStack::GetStorage() { return nullptr; }

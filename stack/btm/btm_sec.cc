@@ -34,6 +34,8 @@
 #include "common/metrics.h"
 #include "common/time_util.h"
 #include "device/include/controller.h"
+#include "main/shim/btm_api.h"
+#include "main/shim/shim.h"
 #include "osi/include/log.h"
 #include "osi/include/osi.h"
 
@@ -995,7 +997,7 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
 
 /*******************************************************************************
  *
- * Function         BTM_SecBondByTransport
+ * Function         BTM_SecBond
  *
  * Description      This function is called to perform bonding with peer device.
  *                  If the connection is already up, but not secure, pairing
@@ -1010,11 +1012,18 @@ tBTM_STATUS btm_sec_bond_by_transport(const RawAddress& bd_addr,
  *
  *  Note: After 2.1 parameters are not used and preserved here not to change API
  ******************************************************************************/
-tBTM_STATUS BTM_SecBondByTransport(const RawAddress& bd_addr,
-                                   tBT_TRANSPORT transport, uint8_t pin_len,
-                                   uint8_t* p_pin, uint32_t trusted_mask[]) {
+tBTM_STATUS BTM_SecBond(const RawAddress& bd_addr, tBLE_ADDR_TYPE addr_type,
+                        tBT_TRANSPORT transport, uint8_t pin_len,
+                        uint8_t* p_pin, uint32_t trusted_mask[]) {
+  if (bluetooth::shim::is_gd_shim_enabled()) {
+    return bluetooth::shim::BTM_SecBond(bd_addr, addr_type, transport, pin_len,
+                                        p_pin, trusted_mask);
+  }
+
+  if (transport == BT_TRANSPORT_INVALID)
+    transport = BTM_UseLeLink(bd_addr) ? BT_TRANSPORT_LE : BT_TRANSPORT_BR_EDR;
+
   tBT_DEVICE_TYPE dev_type;
-  tBLE_ADDR_TYPE addr_type;
 
   BTM_ReadDevInfo(bd_addr, &dev_type, &addr_type);
   /* LE device, do SMP pairing */
@@ -1027,29 +1036,6 @@ tBTM_STATUS BTM_SecBondByTransport(const RawAddress& bd_addr,
                                    trusted_mask);
 }
 
-/*******************************************************************************
- *
- * Function         BTM_SecBond
- *
- * Description      This function is called to perform bonding with peer device.
- *                  If the connection is already up, but not secure, pairing
- *                  is attempted.  If already paired BTM_SUCCESS is returned.
- *
- * Parameters:      bd_addr      - Address of the device to bond
- *                  pin_len      - length in bytes of the PIN Code
- *                  p_pin        - pointer to array with the PIN Code
- *                  trusted_mask - bitwise OR of trusted services
- *                                 (array of uint32_t)
- *
- *  Note: After 2.1 parameters are not used and preserved here not to change API
- ******************************************************************************/
-tBTM_STATUS BTM_SecBond(const RawAddress& bd_addr, uint8_t pin_len,
-                        uint8_t* p_pin, uint32_t trusted_mask[]) {
-  tBT_TRANSPORT transport = BT_TRANSPORT_BR_EDR;
-  if (BTM_UseLeLink(bd_addr)) transport = BT_TRANSPORT_LE;
-  return btm_sec_bond_by_transport(bd_addr, transport, pin_len, p_pin,
-                                   trusted_mask);
-}
 /*******************************************************************************
  *
  * Function         BTM_SecBondCancel

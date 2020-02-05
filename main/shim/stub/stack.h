@@ -29,12 +29,12 @@ class TestGdShimL2cap : public bluetooth::shim::IL2cap {
   std::set<uint16_t /* psm */> registered_service_;
 
   void RegisterService(uint16_t psm, bool use_ertm, uint16_t mtu,
-                       bluetooth::shim::ConnectionOpenCallback on_open,
-                       std::promise<void> completed) override;
+                       bluetooth::shim::ConnectionCompleteCallback on_complete,
+                       std::promise<void> registered) override;
   void UnregisterService(uint16_t psm);
   void CreateConnection(uint16_t psm, const std::string address,
-                        bluetooth::shim::ConnectionOpenCallback on_open,
-                        std::promise<uint16_t> completed) override;
+                        bluetooth::shim::ConnectionCompleteCallback on_complete,
+                        std::promise<uint16_t> created) override;
   void CloseConnection(uint16_t cid);
   void SetReadDataReadyCallback(
       uint16_t cid,
@@ -43,9 +43,6 @@ class TestGdShimL2cap : public bluetooth::shim::IL2cap {
       uint16_t cid,
       bluetooth::shim::ConnectionClosedCallback on_closed) override;
   void Write(uint16_t cid, const uint8_t* data, size_t len) override;
-  void WriteFlushable(uint16_t cid, const uint8_t* data, size_t len) override;
-  void WriteNonFlushable(uint16_t cid, const uint8_t* data,
-                         size_t len) override;
   void SendLoopbackResponse(std::function<void()>) override;
 };
 
@@ -57,12 +54,15 @@ class TestStack : public bluetooth::shim::IStack {
   bluetooth::shim::IController* GetController();
   bluetooth::shim::IConnectability* GetConnectability();
   bluetooth::shim::IDiscoverability* GetDiscoverability();
+  bluetooth::shim::IDumpsys* GetDumpsys();
   bluetooth::shim::IHciLayer* GetHciLayer();
   bluetooth::shim::IInquiry* GetInquiry();
   bluetooth::shim::IL2cap* GetL2cap();
   bluetooth::shim::IName* GetName();
   bluetooth::shim::IPage* GetPage();
   bluetooth::shim::IScanning* GetScanning();
+  bluetooth::shim::ISecurity* GetSecurity();
+  bluetooth::shim::IStorage* GetStorage();
 
   TestGdShimL2cap test_l2cap_;
 

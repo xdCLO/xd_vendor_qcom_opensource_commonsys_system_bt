@@ -65,6 +65,14 @@ class Link : public l2cap::internal::ILink {
 
   virtual void Disconnect();
 
+  virtual void Encrypt();
+
+  virtual void Authenticate();
+
+  virtual void ReadRemoteSupportedFeatures();
+
+  virtual void ReadRemoteExtendedFeatures();
+
   // FixedChannel methods
 
   std::shared_ptr<FixedChannelImpl> AllocateFixedChannel(Cid cid, SecurityPolicy security_policy);
