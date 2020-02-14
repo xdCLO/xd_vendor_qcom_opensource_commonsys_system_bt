@@ -283,10 +283,13 @@ Stage1ResultOrFailure PairingHandlerLe::SecureConnectionsPasskeyEntry(const Init
     constexpr uint32_t PASSKEY_MAX = 999999;
     while (passkey > PASSKEY_MAX) passkey >>= 1;
 
-    i.ui_handler->DisplayPasskey(passkey);
+    i.user_interface_handler->Post(common::BindOnce(&UI::DisplayPasskey, common::Unretained(i.user_interface),
+                                                    i.remote_connection_address, i.remote_name, passkey));
 
   } else if (my_iocaps == IoCapability::KEYBOARD_ONLY || remote_iocaps == IoCapability::DISPLAY_ONLY) {
-    i.ui_handler->DisplayEnterPasskeyDialog();
+    i.user_interface_handler->Post(common::BindOnce(&UI::DisplayEnterPasskeyDialog,
+                                                    common::Unretained(i.user_interface), i.remote_connection_address,
+                                                    i.remote_name));
     std::optional<PairingEvent> response = WaitUiPasskey();
     if (!response) return PairingFailure("Passkey did not arrive!");
 
@@ -401,7 +404,8 @@ Stage1ResultOrFailure PairingHandlerLe::SecureConnectionsNumericComparison(const
 
   uint32_t number_to_display = crypto_toolbox::g2((uint8_t*)PKa.x.data(), (uint8_t*)PKb.x.data(), Na, Nb);
 
-  i.ui_handler->DisplayConfirmValue(number_to_display);
+  i.user_interface_handler->Post(common::BindOnce(&UI::DisplayConfirmValue, common::Unretained(i.user_interface),
+                                                  i.remote_connection_address, i.remote_name, number_to_display));
 
   std::optional<PairingEvent> confirmyesno = WaitUiConfirmYesNo();
   if (!confirmyesno || confirmyesno->ui_value == 0) {
@@ -414,7 +418,7 @@ Stage1ResultOrFailure PairingHandlerLe::SecureConnectionsNumericComparison(const
 
 Stage1ResultOrFailure PairingHandlerLe::SecureConnectionsJustWorks(const InitialInformations& i,
                                                                    const EcdhPublicKey& PKa, const EcdhPublicKey& PKb) {
-  Octet16 Ca, Cb, Na, Nb, ra, rb;
+  Octet16 Cb, Na, Nb, ra, rb;
 
   ra = rb = {0};
 
@@ -437,13 +441,13 @@ Stage1ResultOrFailure PairingHandlerLe::SecureConnectionsJustWorks(const Initial
     }
     Nb = std::get<PairingRandomView>(random).GetRandomValue();
 
-    // Compute confirm
-    Ca = crypto_toolbox::f4((uint8_t*)PKb.x.data(), (uint8_t*)PKa.x.data(), Nb, 0);
+    // Compute Cb locally
+    Octet16 Cb_local = crypto_toolbox::f4((uint8_t*)PKb.x.data(), (uint8_t*)PKa.x.data(), Nb, 0);
 
-    if (Ca != Cb) {
-      LOG_INFO("Ca != Cb, aborting!");
+    if (Cb_local != Cb) {
+      LOG_INFO("Cb_local != Cb, aborting!");
       SendL2capPacket(i, PairingFailedBuilder::Create(PairingFailedReason::CONFIRM_VALUE_FAILED));
-      return PairingFailure("Ca != Cb");
+      return PairingFailure("Cb_local != Cb");
     }
   } else {
     Nb = GenerateRandom<16>();
