@@ -131,7 +131,7 @@ InitialInformations initial_informations{
 
     .remotely_initiated = false,
     .remote_connection_address = {{}, hci::AddressType::RANDOM_DEVICE_ADDRESS},
-    .ui_handler = &uiMock,
+    .user_interface = &uiMock,
     .le_security_interface = &leSecurityMock,
     .OnPairingFinished = OnPairingFinished,
 };
@@ -139,6 +139,7 @@ InitialInformations initial_informations{
 TEST_F(PairingHandlerUnitTest, test_phase_1_failure) {
   initial_informations.proper_l2cap_interface = up_buffer_.get();
   initial_informations.l2cap_handler = handler_;
+  initial_informations.user_interface_handler = handler_;
 
   std::unique_ptr<PairingHandlerLe> pairing_handler =
       std::make_unique<PairingHandlerLe>(PairingHandlerLe::PHASE1, initial_informations);
@@ -160,6 +161,7 @@ TEST_F(PairingHandlerUnitTest, test_phase_1_failure) {
 TEST_F(PairingHandlerUnitTest, test_secure_connections_just_works) {
   initial_informations.proper_l2cap_interface = up_buffer_.get();
   initial_informations.l2cap_handler = handler_;
+  initial_informations.user_interface_handler = handler_;
 
   // we keep the pairing_handler as unique_ptr to better mimick how it's used
   // in the real world
@@ -198,7 +200,7 @@ TEST_F(PairingHandlerUnitTest, test_secure_connections_just_works) {
   Octet16 Nb = PairingHandlerLe::GenerateRandom<16>();
 
   // Compute confirm
-  Octet16 Cb = crypto_toolbox::f4((uint8_t*)my_public_key.x.data(), (uint8_t*)public_key.x.data(), Nb, 0);
+  Octet16 Cb = crypto_toolbox::f4((uint8_t*)public_key.x.data(), (uint8_t*)my_public_key.x.data(), Nb, 0);
 
   pairing_handler->OnCommandView(BuilderToView(PairingConfirmBuilder::Create(Cb)));
 
@@ -208,11 +210,6 @@ TEST_F(PairingHandlerUnitTest, test_secure_connections_just_works) {
   auto prv = PairingRandomView::Create(outgoing_l2cap_packet_.value());
   prv.IsValid();
   Octet16 Na = prv.GetRandomValue();
-
-  // Compute Ca, compare
-  Octet16 Ca = crypto_toolbox::f4((uint8_t*)my_public_key.x.data(), (uint8_t*)public_key.x.data(), Na, 0);
-
-  EXPECT_EQ(Ca, Cb);
 
   pairing_handler->OnCommandView(BuilderToView(PairingRandomBuilder::Create(Nb)));
 
@@ -265,7 +262,7 @@ InitialInformations initial_informations_trsi{
 
     .remotely_initiated = true,
     .remote_connection_address = hci::AddressWithType(),
-    .ui_handler = &uiMock,
+    .user_interface = &uiMock,
     .le_security_interface = &leSecurityMock,
     .OnPairingFinished = OnPairingFinished,
 };
@@ -275,6 +272,7 @@ InitialInformations initial_informations_trsi{
 TEST_F(PairingHandlerUnitTest, test_remote_slave_initiating) {
   initial_informations_trsi.proper_l2cap_interface = up_buffer_.get();
   initial_informations_trsi.l2cap_handler = handler_;
+  initial_informations_trsi.user_interface_handler = handler_;
 
   std::unique_ptr<PairingHandlerLe> pairing_handler =
       std::make_unique<PairingHandlerLe>(PairingHandlerLe::ACCEPT_PROMPT, initial_informations_trsi);
@@ -305,7 +303,7 @@ InitialInformations initial_informations_trmi{
     .pairing_request = PairingRequestView::Create(BuilderToView(
         PairingRequestBuilder::Create(IoCapability::NO_INPUT_NO_OUTPUT, OobDataFlag::NOT_PRESENT,
                                       AuthReqMaskBondingFlag | AuthReqMaskMitm | AuthReqMaskSc, 16, 0x03, 0x03))),
-    .ui_handler = &uiMock,
+    .user_interface = &uiMock,
     .le_security_interface = &leSecurityMock,
 
     .OnPairingFinished = OnPairingFinished,
@@ -316,6 +314,7 @@ InitialInformations initial_informations_trmi{
 TEST_F(PairingHandlerUnitTest, test_remote_master_initiating) {
   initial_informations_trmi.proper_l2cap_interface = up_buffer_.get();
   initial_informations_trmi.l2cap_handler = handler_;
+  initial_informations_trmi.user_interface_handler = handler_;
 
   std::unique_ptr<PairingHandlerLe> pairing_handler =
       std::make_unique<PairingHandlerLe>(PairingHandlerLe::ACCEPT_PROMPT, initial_informations_trmi);
