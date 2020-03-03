@@ -33,7 +33,8 @@ namespace bluetooth {
 namespace security {
 namespace internal {
 
-void SecurityManagerImpl::DispatchPairingHandler(record::SecurityRecord& record, bool locally_initiated) {
+void SecurityManagerImpl::DispatchPairingHandler(record::SecurityRecord& record, bool locally_initiated,
+                                                 hci::AuthenticationRequirements authentication_requirements) {
   common::OnceCallback<void(hci::Address, PairingResultOrFailure)> callback =
       common::BindOnce(&SecurityManagerImpl::OnPairingHandlerComplete, common::Unretained(this));
   auto entry = pairing_handler_map_.find(record.GetPseudoAddress().GetAddress());
@@ -58,7 +59,7 @@ void SecurityManagerImpl::DispatchPairingHandler(record::SecurityRecord& record,
       record.GetPseudoAddress().GetAddress(), pairing_handler);
   pairing_handler_map_.insert(std::move(new_entry));
   pairing_handler->Initiate(locally_initiated, pairing::kDefaultIoCapability, pairing::kDefaultOobDataPresent,
-                            pairing::kDefaultAuthenticationRequirements);
+                            authentication_requirements);
 }
 
 void SecurityManagerImpl::Init() {
@@ -74,7 +75,7 @@ void SecurityManagerImpl::CreateBond(hci::AddressWithType device) {
     NotifyDeviceBonded(device);
   } else {
     // Dispatch pairing handler, if we are calling create we are the initiator
-    DispatchPairingHandler(record, true);
+    DispatchPairingHandler(record, true, pairing::kDefaultAuthenticationRequirements);
   }
 }
 
@@ -162,26 +163,27 @@ template <class T>
 void SecurityManagerImpl::HandleEvent(T packet) {
   ASSERT(packet.IsValid());
   auto entry = pairing_handler_map_.find(packet.GetBdAddr());
-  if (entry != pairing_handler_map_.end()) {
-    entry->second->OnReceive(packet);
-  } else {
+
+  if (entry == pairing_handler_map_.end()) {
     auto bd_addr = packet.GetBdAddr();
     auto event_code = packet.GetEventCode();
     auto event = hci::EventPacketView::Create(std::move(packet));
     ASSERT_LOG(event.IsValid(), "Received invalid packet");
+
     const hci::EventCode code = event.GetEventCode();
+    if (code != hci::EventCode::LINK_KEY_REQUEST) {
+      LOG_ERROR("No classic pairing handler for device '%s' ready for command %s ", bd_addr.ToString().c_str(),
+                hci::EventCodeText(event_code).c_str());
+      return;
+    }
+
     auto record =
         security_database_.FindOrCreate(hci::AddressWithType{bd_addr, hci::AddressType::PUBLIC_DEVICE_ADDRESS});
-    switch (code) {
-      case hci::EventCode::LINK_KEY_REQUEST:
-        DispatchPairingHandler(record, true);
-        break;
-      default:
-        LOG_ERROR("No classic pairing handler for device '%s' ready for command '%hhx' ", bd_addr.ToString().c_str(),
-                  event_code);
-        break;
-    }
+    auto authentication_requirements = hci::AuthenticationRequirements::NO_BONDING;
+    DispatchPairingHandler(record, true, authentication_requirements);
+    entry = pairing_handler_map_.find(packet.GetBdAddr());
   }
+  entry->second->OnReceive(packet);
 }
 
 void SecurityManagerImpl::OnHciEventReceived(hci::EventPacketView packet) {
@@ -250,6 +252,37 @@ void SecurityManagerImpl::OnHciLeEvent(hci::LeMetaEventView event) {
   // hci::SubeventCode::READ_LOCAL_P256_PUBLIC_KEY_COMPLETE,
   // hci::SubeventCode::GENERATE_DHKEY_COMPLETE,
   LOG_ERROR("Unhandled HCI LE security event");
+}
+
+void SecurityManagerImpl::OnPairingPromptAccepted(const bluetooth::hci::AddressWithType& address, bool confirmed) {
+  auto entry = pairing_handler_map_.find(address.GetAddress());
+  if (entry != pairing_handler_map_.end()) {
+    entry->second->OnPairingPromptAccepted(address, confirmed);
+  } else {
+    pending_le_pairing_.handler_->OnUiAction(PairingEvent::UI_ACTION_TYPE::PAIRING_ACCEPTED, confirmed);
+  }
+}
+
+void SecurityManagerImpl::OnConfirmYesNo(const bluetooth::hci::AddressWithType& address, bool confirmed) {
+  auto entry = pairing_handler_map_.find(address.GetAddress());
+  if (entry != pairing_handler_map_.end()) {
+    entry->second->OnConfirmYesNo(address, confirmed);
+  } else {
+    if (pending_le_pairing_.address_ == address) {
+      pending_le_pairing_.handler_->OnUiAction(PairingEvent::UI_ACTION_TYPE::CONFIRM_YESNO, confirmed);
+    }
+  }
+}
+
+void SecurityManagerImpl::OnPasskeyEntry(const bluetooth::hci::AddressWithType& address, uint32_t passkey) {
+  auto entry = pairing_handler_map_.find(address.GetAddress());
+  if (entry != pairing_handler_map_.end()) {
+    entry->second->OnPasskeyEntry(address, passkey);
+  } else {
+    if (pending_le_pairing_.address_ == address) {
+      pending_le_pairing_.handler_->OnUiAction(PairingEvent::UI_ACTION_TYPE::PASSKEY, passkey);
+    }
+  }
 }
 
 void SecurityManagerImpl::OnPairingHandlerComplete(hci::Address address, PairingResultOrFailure status) {

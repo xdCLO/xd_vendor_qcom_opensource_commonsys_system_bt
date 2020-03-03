@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Android Open Source Project
+ * Copyright 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,37 +15,44 @@
  */
 #pragma once
 
+#include <array>
+#include <cstdint>
 #include <memory>
-#include <string>
 
+#include "common/bind.h"
+#include "hci/address.h"
+#include "hci/hci_packets.h"
 #include "module.h"
-#include "shim/iconnectability.h"
+#include "neighbor/name.h"
 
 namespace bluetooth {
-namespace shim {
+namespace neighbor {
 
-class Connectability : public bluetooth::Module, public bluetooth::shim::IConnectability {
+using ReadRemoteNameDbCallback = common::OnceCallback<void(hci::Address address, bool success)>;
+
+class NameDbModule : public bluetooth::Module {
  public:
-  void StartConnectability() override;
-  void StopConnectability() override;
-  bool IsConnectable() const override;
+  void ReadRemoteNameRequest(hci::Address address, ReadRemoteNameDbCallback callback, os::Handler* handler);
 
-  Connectability() = default;
-  ~Connectability() = default;
+  bool IsNameCached(hci::Address address) const;
+  RemoteName ReadCachedRemoteName(hci::Address address) const;
 
   static const ModuleFactory Factory;
 
+  NameDbModule();
+  ~NameDbModule();
+
  protected:
-  void ListDependencies(ModuleList* list) override;  // Module
-  void Start() override;                             // Module
-  void Stop() override;                              // Module
-  std::string ToString() const override;             // Module
+  void ListDependencies(ModuleList* list) override;
+  void Start() override;
+  void Stop() override;
 
  private:
   struct impl;
   std::unique_ptr<impl> pimpl_;
-  DISALLOW_COPY_AND_ASSIGN(Connectability);
+
+  DISALLOW_COPY_AND_ASSIGN(NameDbModule);
 };
 
-}  // namespace shim
+}  // namespace neighbor
 }  // namespace bluetooth
