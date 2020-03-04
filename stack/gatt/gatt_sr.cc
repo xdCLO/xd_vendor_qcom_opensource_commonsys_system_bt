@@ -878,7 +878,7 @@ void gatts_process_write_req(tGATT_TCB& tcb, tGATT_SRV_LIST_ELEM& el,
 
   switch (op_code) {
     case GATT_REQ_PREPARE_WRITE:
-      if (len < 2) {
+      if (len < 2 || p == nullptr) {
         LOG(ERROR) << __func__
                    << ": Prepare write request was invalid - missing offset, "
                       "sending error response";
@@ -900,8 +900,9 @@ void gatts_process_write_req(tGATT_TCB& tcb, tGATT_SRV_LIST_ELEM& el,
       if (op_code == GATT_REQ_WRITE || op_code == GATT_REQ_PREPARE_WRITE)
         sr_data.write_req.need_rsp = true;
       sr_data.write_req.handle = handle;
+	  if (len > GATT_MAX_ATTR_LEN) len = GATT_MAX_ATTR_LEN;
       sr_data.write_req.len = len;
-      if (len != 0 && p != NULL) {
+      if (len != 0 && p != nullptr) {
         memcpy(sr_data.write_req.value, p, len);
       }
       break;
