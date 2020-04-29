@@ -282,6 +282,10 @@ class BtifAvPeer {
 
   void SetSilence(bool silence) { is_silenced_ = silence; };
 
+  // AVDTP delay reporting in 1/10 milliseconds
+  void SetDelayReport(uint16_t delay) { delay_report_ = delay; };
+  uint16_t GetDelayReport() const { return delay_report_; };
+
   /**
    * Check whether any of the flags specified by the bitlags mask is set.
    *
@@ -330,6 +334,7 @@ class BtifAvPeer {
   uint8_t flags_;
   bool self_initiated_connection_;
   bool is_silenced_;
+  uint16_t delay_report_;
 };
 
 class BtifAvSource {
@@ -864,7 +869,8 @@ BtifAvPeer::BtifAvPeer(const RawAddress& peer_address, uint8_t peer_sep,
       av_open_on_rc_timer_(nullptr),
       edr_(0),
       flags_(0),
-      self_initiated_connection_(false) {}
+      self_initiated_connection_(false),
+      delay_report_(0) {}
 
 BtifAvPeer::~BtifAvPeer() { alarm_free(av_open_on_rc_timer_); }
 
@@ -2690,20 +2696,25 @@ static bt_status_t connect_int(RawAddress* peer_address, uint16_t uuid) {
   BTIF_TRACE_EVENT("%s: peer_address=%s uuid=0x%x", __func__,
                    peer_address->ToString().c_str(), uuid);
 
-  BtifAvPeer* peer = nullptr;
-  if (uuid == UUID_SERVCLASS_AUDIO_SOURCE) {
-    peer = btif_av_source.FindOrCreatePeer(*peer_address, kBtaHandleUnknown);
-    if (peer == nullptr) {
-      return BT_STATUS_FAIL;
+  auto connection_task = [](RawAddress* peer_address, uint16_t uuid) {
+    BtifAvPeer* peer = nullptr;
+    if (uuid == UUID_SERVCLASS_AUDIO_SOURCE) {
+      peer = btif_av_source.FindOrCreatePeer(*peer_address, kBtaHandleUnknown);
+    } else if (uuid == UUID_SERVCLASS_AUDIO_SINK) {
+      peer = btif_av_sink.FindOrCreatePeer(*peer_address, kBtaHandleUnknown);
     }
-  } else if (uuid == UUID_SERVCLASS_AUDIO_SINK) {
-    peer = btif_av_sink.FindOrCreatePeer(*peer_address, kBtaHandleUnknown);
     if (peer == nullptr) {
-      return BT_STATUS_FAIL;
+      btif_queue_advance();
+      return;
     }
+    peer->StateMachine().ProcessEvent(BTIF_AV_CONNECT_REQ_EVT, nullptr);
+  };
+  bt_status_t status = do_in_main_thread(
+      FROM_HERE, base::BindOnce(connection_task, peer_address, uuid));
+  if (status != BT_STATUS_SUCCESS) {
+    LOG(ERROR) << __func__ << ": can't post connection task to main_thread";
   }
-  peer->StateMachine().ProcessEvent(BTIF_AV_CONNECT_REQ_EVT, nullptr);
-  return BT_STATUS_SUCCESS;
+  return status;
 }
 
 static void set_source_silence_peer_int(const RawAddress& peer_address,
@@ -3263,6 +3274,7 @@ static void btif_debug_av_peer_dump(int fd, const BtifAvPeer& peer) {
   dprintf(fd, "    Support 3Mbps: %s\n", peer.Is3Mbps() ? "true" : "false");
   dprintf(fd, "    Self Initiated Connection: %s\n",
           peer.SelfInitiatedConnection() ? "true" : "false");
+  dprintf(fd, "    Delay Reporting: %u\n", peer.GetDelayReport());
 }
 
 static void btif_debug_av_source_dump(int fd) {
@@ -3297,9 +3309,23 @@ void btif_debug_av_dump(int fd) {
   btif_debug_av_sink_dump(fd);
 }
 
-void btif_av_set_audio_delay(uint16_t delay) {
+void btif_av_set_audio_delay(const RawAddress& peer_address, uint16_t delay) {
   btif_a2dp_control_set_audio_delay(delay);
-  bluetooth::audio::a2dp::set_remote_delay(delay);
+  BtifAvPeer* peer = btif_av_find_peer(peer_address);
+  if (peer != nullptr && peer->IsSink()) {
+    peer->SetDelayReport(delay);
+    if (peer->IsActivePeer()) {
+      bluetooth::audio::a2dp::set_remote_delay(peer->GetDelayReport());
+    }
+  }
+}
+
+uint16_t btif_av_get_audio_delay() {
+  BtifAvPeer* peer = btif_av_find_active_peer();
+  if (peer != nullptr && peer->IsSink()) {
+    return peer->GetDelayReport();
+  }
+  return 0;
 }
 
 void btif_av_reset_audio_delay(void) { btif_a2dp_control_reset_audio_delay(); }
