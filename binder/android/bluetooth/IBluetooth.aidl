@@ -181,4 +181,7 @@ interface IBluetooth
     void onBrEdrDown();
     int setSocketOpt(int type, int port, int optionName, in byte [] optionVal, int optionLen);
     int getSocketOpt(int type, int port, int optionName, out byte [] optionVal);
+    boolean setClockSyncConfig(boolean enable, int mode, int adv_interval,
+        int channel, int jitter, int offset);
+    boolean startClockSync();
 }
