@@ -595,6 +595,11 @@ static tAVRC_STS avrc_pars_browsing_cmd(tAVRC_MSG_BROWSE* p_msg,
       }
       BE_STREAM_TO_UINT16(p_result->search.string.charset_id, p);
       BE_STREAM_TO_UINT16(p_result->search.string.str_len, p);
+      if (p_browse_packet_len - 4 != p_result->search.string.str_len) {
+        AVRC_TRACE_ERROR("%s: browse packet length criteria didn't match,status:%d ",
+                                 __func__, status);
+        return AVRC_STS_BAD_CMD;
+      }
       p_result->search.string.p_str = p_buf;
       if (p_buf) {
         AVRC_TRACE_DEBUG("%s: p_buf is valid", __func__);
