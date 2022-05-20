@@ -218,6 +218,7 @@ static bool prop_upd(const RawAddress* remote_bd_addr, bt_property_t *prop)
     case BT_PROPERTY_REMOTE_FRIENDLY_NAME:
       strlcpy(value, (char*)prop->val, prop->len + 1);
       btif_config_set_str(bdstr, BTIF_STORAGE_PATH_REMOTE_ALIASE, value);
+      btif_config_flush();
       break;
     case BT_PROPERTY_ADAPTER_SCAN_MODE:
       btif_config_set_int("Adapter", BTIF_STORAGE_KEY_ADAPTER_SCANMODE,
