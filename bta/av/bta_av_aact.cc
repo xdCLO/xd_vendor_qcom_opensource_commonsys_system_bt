@@ -2106,7 +2106,10 @@ void bta_av_save_caps(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
 
   APPL_TRACE_DEBUG("%s: num_seps:%d sep_info_idx:%d wait:x%x", __func__,
                    p_scb->num_seps, p_scb->sep_info_idx, p_scb->wait);
-
+  if (p_scb->p_cap==nullptr) {
+    APPL_TRACE_ERROR("%s: Peer capability is NULL in stream control block, return", __func__);
+    return;
+  }
   media_type = A2DP_GetMediaType(p_scb->p_cap->codec_info);
   codec_type = A2DP_GetCodecType(p_scb->p_cap->codec_info);
   APPL_TRACE_DEBUG("%s: num_codec %d", __func__, p_scb->p_cap->num_codec);
