@@ -371,6 +371,6 @@ void bta_dm_co_ble_io_req(const RawAddress& bd_addr, tBTA_IO_CAP* p_io_cap,
   if (bte_appl_cfg.ble_resp_key <= BTM_BLE_RESPONDER_KEY_SIZE)
     *p_resp_key = bte_appl_cfg.ble_resp_key;
 
-  if (bte_appl_cfg.ble_max_key_size > 7 && bte_appl_cfg.ble_max_key_size <= 16)
+  if (bte_appl_cfg.ble_max_key_size >= 7 && bte_appl_cfg.ble_max_key_size <= 16)
     *p_max_key_size = bte_appl_cfg.ble_max_key_size;
 }
