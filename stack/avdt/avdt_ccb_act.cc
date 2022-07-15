@@ -459,6 +459,9 @@ void avdt_ccb_hdl_getcap_cmd(tAVDT_CCB* p_ccb, tAVDT_CCB_EVT* p_data) {
   p_scb = avdt_scb_by_hdl(p_data->msg.single.seid);
   if (p_scb == NULL) {
       AVDT_TRACE_WARNING("%s: scb is null", __func__);
+      p_data->msg.hdr.err_code = AVDT_ERR_BAD_STATE;
+      p_data->msg.hdr.err_param = p_data->msg.single.seid;
+      avdt_msg_send_rej(p_ccb, AVDT_SIG_START, &p_data->msg);
       return;
   }
   p_data->msg.svccap.p_cfg = &p_scb->cs.cfg;
