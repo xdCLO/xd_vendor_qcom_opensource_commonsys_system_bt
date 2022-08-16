@@ -990,6 +990,7 @@ bool A2dpCodecs::getCodecConfigAndCapabilities(
     std::vector<btav_a2dp_codec_config_t>* p_codecs_local_capabilities,
     std::vector<btav_a2dp_codec_config_t>* p_codecs_selectable_capabilities) {
   std::lock_guard<std::recursive_mutex> lock(codec_mutex_);
+  LOG_DEBUG(LOG_TAG, "%s: Recursive mutex lock acquired", __func__);
 
   if (current_codec_config_ != nullptr) {
     LOG_DEBUG(LOG_TAG, "%s: current_codec_config_ not null, getCodecConfig()", __func__);
@@ -1020,6 +1021,8 @@ bool A2dpCodecs::getCodecConfigAndCapabilities(
     codecs_capabilities.push_back(codec_capability);
   }
   *p_codecs_selectable_capabilities = codecs_capabilities;
+
+  LOG_DEBUG(LOG_TAG, "%s: Recursive mutex lock released", __func__);
 
   return true;
 }
