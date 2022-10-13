@@ -1948,11 +1948,8 @@ static void write_report_cb(uint16_t conn_id, tGATT_STATUS status,
 
   const gatt::Characteristic* p_char =
       BTA_GATTC_GetCharacteristic(conn_id, handle);
-  if (p_char == NULL) {
-    LOG_WARN(LOG_TAG, "%s No such characteristic: %d conn_id: %d", __func__,
-      handle, conn_id);
-    return;
-  }
+
+  if (p_char == nullptr) return;
 
   uint16_t uuid = p_char->uuid.As16Bit();
   if (uuid != GATT_UUID_HID_REPORT && uuid != GATT_UUID_HID_BT_KB_INPUT &&
