@@ -14,6 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center are provided under the following license:
+ *  Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
  ******************************************************************************/
 
 #include <base/logging.h>
@@ -59,6 +62,11 @@ static void remove_digitizer_descriptor(uint8_t* data, uint16_t* length) {
   /* Parse until complete report descriptor is parsed */
   while (startDescPtr < data + *length) {
     uint8_t item = *startDescPtr++;
+    if (startDescPtr > data + *length) {
+      APPL_TRACE_ERROR("%s: is having invalid startDescPtr: %p",
+                       __func__, startDescPtr);
+      return;
+    }
     uint8_t usage_page;
 
     switch (item) {
