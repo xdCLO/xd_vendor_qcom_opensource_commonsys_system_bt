@@ -2392,16 +2392,20 @@ void bta_av_rc_disc_done(UNUSED_ATTR tBTA_AV_DATA* p_data) {
             p_cb->rcb[rc_handle].peer_features = peer_features;
             p_cb->rcb[rc_handle].cover_art_psm = cover_art_psm;
           } else {
-            /* cannot create valid rc_handle for current device */
-            APPL_TRACE_ERROR(" No link resources available");
-            p_scb->use_rc = FALSE;
+            /* Cannot create valid rc_handle for current device. Report failure*/
+            APPL_TRACE_ERROR("%s: No link resources available", __func__);
+            p_scb->use_rc = false;
+            tBTA_AV_RC_OPEN rc_open;
             rc_open.peer_addr = p_scb->peer_addr;
             rc_open.peer_features = 0;
+            rc_open.cover_art_psm = 0;
             rc_open.status = BTA_AV_FAIL_RESOURCES;
-            (*p_cb->p_cback)(BTA_AV_RC_OPEN_EVT, (tBTA_AV *) &rc_open);
+            tBTA_AV bta_av_data;
+            bta_av_data.rc_open = rc_open;
+            (*p_cb->p_cback)(BTA_AV_RC_OPEN_EVT, &bta_av_data);
           }
         } else {
-          APPL_TRACE_ERROR("can not find LCB!!");
+          APPL_TRACE_ERROR("%s: can not find LCB!!", __func__);
         }
       } else if (p_scb->use_rc) {
         /* can not find AVRC on peer device. report failure */
