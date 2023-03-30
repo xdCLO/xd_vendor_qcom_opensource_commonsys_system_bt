@@ -458,7 +458,7 @@ static tAVRC_STS avrc_pars_browsing_cmd(tAVRC_MSG_BROWSE* p_msg,
   tAVRC_STS status = AVRC_STS_NO_ERROR;
   uint8_t* p = p_msg->p_browse_data;
   int count, p_browse_packet_len = 0;
-  uint16_t min_len = 3;
+  uint32_t min_len = 3;
 
   p_result->pdu = *p++;
   AVRC_TRACE_DEBUG("%s: pdu:0x%x, *p:%d , buf_len: %d",
