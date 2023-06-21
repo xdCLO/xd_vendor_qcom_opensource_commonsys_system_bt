@@ -230,6 +230,12 @@ void sdp_disc_server_rsp(tCONN_CB* p_ccb, BT_HDR* p_msg) {
   p = (uint8_t*)(p_msg + 1) + p_msg->offset;
   uint8_t* p_end = p + p_msg->len;
 
+  if (p_msg->len < 1) {
+    android_errorWriteLog(0x534e4554, "79883568");
+    sdp_disconnect(p_ccb, SDP_GENERIC_ERROR);
+    return;
+  }
+
   BE_STREAM_TO_UINT8(rsp_pdu, p);
 
   p_msg->len--;
@@ -292,7 +298,7 @@ static void process_service_search_rsp(tCONN_CB* p_ccb, uint8_t* p_reply,
 
   orig = p_ccb->num_handles;
   p_ccb->num_handles += cur_handles;
-  if (p_ccb->num_handles == 0) {
+  if (p_ccb->num_handles == 0 || p_ccb->num_handles < orig) {
     SDP_TRACE_WARNING("SDP - Rcvd ServiceSearchRsp, no matches");
     sdp_disconnect(p_ccb, SDP_NO_RECS_MATCH);
     return;
@@ -432,6 +438,11 @@ static void process_service_attr_rsp(tCONN_CB* p_ccb, uint8_t* p_reply,
     SDP_TRACE_WARNING("ID & len: 0x%02x-%02x-%02x-%02x", p_reply[0], p_reply[1],
                       p_reply[2], p_reply[3]);
 #endif
+    if (p_reply + 4 /* transaction ID and length */ + sizeof(list_byte_count) >
+        p_reply_end) {
+      sdp_disconnect(p_ccb, SDP_INVALID_PDU_SIZE);
+      return;
+    }
     /* Skip transaction ID and length */
     p_reply += 4;
 

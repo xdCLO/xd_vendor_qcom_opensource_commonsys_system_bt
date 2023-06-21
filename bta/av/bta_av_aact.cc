@@ -1068,6 +1068,22 @@ void bta_av_delay_rpt(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
  *
  ******************************************************************************/
 void bta_av_do_disc_a2dp(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
+  //To Pass pTS TC A2DP/SRC/AVP/BI-10-C
+  /* After adding PTS dongle to the AAC whitelist,
+   * when PTS pops up a dialog to ask IUT to response a error code,
+   * (Please prepare the IUT to reject an AVDTP SET CONFIGURATION
+   * command with error code INVALID_OBJECT_TYPE, then press 'OK' to continue.)
+   * user needs to click the OK very quickly other wise the case will fail
+   * due to IUT will start discover and set config to PTS.*/
+
+  char is_pts_enable[PROPERTY_VALUE_MAX] = "false";
+  property_get("persist.vendor.bt.a2dp.pts_enable", is_pts_enable, "false");
+  APPL_TRACE_DEBUG("%s: is_pts_enable: %s", __func__, is_pts_enable);
+  if (!strncmp("true", is_pts_enable, 4)) {
+    APPL_TRACE_DEBUG("%s: Don't do a2dp discovery for PTS, return", __func__);
+    return;
+  }
+
   bool ok_continue = false;
   uint16_t avdtp_version = 0;
   tA2DP_SDP_DB_PARAMS db_params;
@@ -1344,7 +1360,7 @@ void bta_av_free_sdb(tBTA_AV_SCB* p_scb, UNUSED_ATTR tBTA_AV_DATA* p_data) {
  *
  ******************************************************************************/
 void bta_av_config_ind(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
-  tBTA_AV_CI_SETCONFIG setconfig;
+  tBTA_AV_CI_SETCONFIG setconfig{};
   tAVDT_SEP_INFO* p_info;
   tAVDT_CFG* p_evt_cfg = &p_data->str_msg.cfg;
   uint8_t psc_mask = (p_evt_cfg->psc_mask | p_scb->cfg.psc_mask);
@@ -2106,7 +2122,10 @@ void bta_av_save_caps(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* p_data) {
 
   APPL_TRACE_DEBUG("%s: num_seps:%d sep_info_idx:%d wait:x%x", __func__,
                    p_scb->num_seps, p_scb->sep_info_idx, p_scb->wait);
-
+  if (p_scb->p_cap==nullptr) {
+    APPL_TRACE_ERROR("%s: Peer capability is NULL in stream control block, return", __func__);
+    return;
+  }
   media_type = A2DP_GetMediaType(p_scb->p_cap->codec_info);
   codec_type = A2DP_GetCodecType(p_scb->p_cap->codec_info);
   APPL_TRACE_DEBUG("%s: num_codec %d", __func__, p_scb->p_cap->num_codec);

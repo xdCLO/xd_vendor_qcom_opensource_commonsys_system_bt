@@ -14,6 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
+ *  Changes from Qualcomm Innovation Center are provided under the following license:
+ *  Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  ******************************************************************************/
 
 #define LOG_TAG "bt_bta_hh"
@@ -1948,11 +1952,8 @@ static void write_report_cb(uint16_t conn_id, tGATT_STATUS status,
 
   const gatt::Characteristic* p_char =
       BTA_GATTC_GetCharacteristic(conn_id, handle);
-  if (p_char == NULL) {
-    LOG_WARN(LOG_TAG, "%s No such characteristic: %d conn_id: %d", __func__,
-      handle, conn_id);
-    return;
-  }
+
+  if (p_char == nullptr) return;
 
   uint16_t uuid = p_char->uuid.As16Bit();
   if (uuid != GATT_UUID_HID_REPORT && uuid != GATT_UUID_HID_BT_KB_INPUT &&
@@ -2344,6 +2345,11 @@ static void read_report_descriptor_ccc_cb(uint16_t conn_id, tGATT_STATUS status,
                                           uint8_t* value, void* data) {
   tBTA_HH_LE_RPT* p_rpt = (tBTA_HH_LE_RPT*)data;
   uint8_t* pp = value;
+  if (len < 2) {
+    APPL_TRACE_ERROR("%s: wrong length - ignoring %d ",__func__,len);
+    p_rpt->client_cfg_value = GATT_CLT_CONFIG_NONE;
+    return;
+  }
   STREAM_TO_UINT16(p_rpt->client_cfg_value, pp);
 
   APPL_TRACE_DEBUG("Read Client Configuration: 0x%04x",

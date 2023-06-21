@@ -218,6 +218,7 @@ static bool prop_upd(const RawAddress* remote_bd_addr, bt_property_t *prop)
     case BT_PROPERTY_REMOTE_FRIENDLY_NAME:
       strlcpy(value, (char*)prop->val, prop->len + 1);
       btif_config_set_str(bdstr, BTIF_STORAGE_PATH_REMOTE_ALIASE, value);
+      btif_config_flush();
       break;
     case BT_PROPERTY_ADAPTER_SCAN_MODE:
       btif_config_set_int("Adapter", BTIF_STORAGE_KEY_ADAPTER_SCANMODE,
@@ -1880,6 +1881,15 @@ bool btif_storage_get_hearing_aid_prop(
  ******************************************************************************/
 bool btif_storage_is_restricted_device(const RawAddress* remote_bd_addr) {
   return btif_config_exist(remote_bd_addr->ToString().c_str(), "Restricted");
+}
+
+int btif_storage_get_num_bonded_devices(void) {
+  uint32_t num_bonded_devices = 0;
+  list_t *bonded_devices = list_new(osi_free);
+  btif_in_fetch_bonded_devices(&bonded_devices, 0);
+  num_bonded_devices = list_length(bonded_devices);
+  list_free(bonded_devices);
+  return num_bonded_devices;
 }
 
 /*******************************************************************************

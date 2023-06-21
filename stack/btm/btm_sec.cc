@@ -2941,6 +2941,8 @@ void btm_sec_dev_reset(void) {
     /* add mx service to use no security */
     BTM_SetSecurityLevel(false, "RFC_MUX", BTM_SEC_SERVICE_RFC_MUX,
                          BTM_SEC_NONE, BT_PSM_RFCOMM, BTM_SEC_PROTO_RFCOMM, 0);
+    BTM_SetSecurityLevel(true, "RFC_MUX", BTM_SEC_SERVICE_RFC_MUX, BTM_SEC_NONE,
+                         BT_PSM_RFCOMM, BTM_SEC_PROTO_RFCOMM, 0);
   } else {
     btm_cb.security_mode = BTM_SEC_MODE_SERVICE;
   }
@@ -4414,7 +4416,6 @@ static void btm_sec_connect_after_reject_timeout(UNUSED_ATTR void* data) {
  ******************************************************************************/
 void btm_sec_connected(const RawAddress& bda, uint16_t handle, uint8_t status,
                        uint8_t enc_mode) {
-  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(bda);
   uint8_t res;
   bool is_pairing_device = false;
   tACL_CONN* p_acl_cb;
@@ -4422,6 +4423,7 @@ void btm_sec_connected(const RawAddress& bda, uint16_t handle, uint8_t status,
 
   btm_acl_resubmit_page(bda, status == HCI_SUCCESS);
 
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev(bda);
   if (p_dev_rec) {
     VLOG(2) << __func__ << ": Security Manager: in state: "
             << btm_pair_state_descr(btm_cb.pairing_state)
@@ -4747,7 +4749,6 @@ tBTM_STATUS btm_sec_disconnect(uint16_t handle, uint8_t reason) {
  *
  ******************************************************************************/
 void btm_sec_disconnected(uint16_t handle, uint8_t reason) {
-  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(handle);
   uint8_t old_pairing_flags = btm_cb.pairing_flags;
   int result = HCI_ERR_AUTH_FAILURE;
   tBTM_SEC_CALLBACK* p_callback = NULL;
@@ -4759,6 +4760,7 @@ void btm_sec_disconnected(uint16_t handle, uint8_t reason) {
 
   btm_acl_resubmit_page();
 
+  tBTM_SEC_DEV_REC* p_dev_rec = btm_find_dev_by_handle(handle);
   if (!p_dev_rec) return;
 
   transport =
@@ -5701,8 +5703,17 @@ tBTM_SEC_SERV_REC* btm_sec_find_first_serv(CONNECTION_TYPE conn_type,
   /* otherwise, just find the first record with the specified PSM */
   for (i = 0; i < BTM_SEC_MAX_SERVICE_RECORDS; i++, p_serv_rec++) {
     if ((p_serv_rec->security_flags & BTM_SEC_IN_USE) &&
-        (p_serv_rec->psm == psm))
-      return (p_serv_rec);
+        (p_serv_rec->psm == psm)) {
+      if (psm == BT_PSM_RFCOMM  && is_originator && !strncmp("RFC_MUX",
+          (char*)p_serv_rec->orig_service_name, BTM_SEC_SERVICE_NAME_LEN - 1)) {
+        return (p_serv_rec);
+      } else if (psm == BT_PSM_RFCOMM  && !is_originator && !strncmp("RFC_MUX",
+          (char*)p_serv_rec->term_service_name, BTM_SEC_SERVICE_NAME_LEN - 1)) {
+        return (p_serv_rec);
+      } if (psm != BT_PSM_RFCOMM) {
+        return (p_serv_rec);
+      }
+    }
   }
   return (NULL);
 }
